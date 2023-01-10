@@ -1,0 +1,535 @@
+package com.github.forax.civilizer;
+
+import com.github.forax.civilizer.runtime.RT;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.Attribute;
+import org.objectweb.asm.ByteVector;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.RecordComponentVisitor;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.TypePath;
+import org.objectweb.asm.TypeReference;
+import org.objectweb.asm.commons.ClassRemapper;
+import org.objectweb.asm.commons.Remapper;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ARETURN;
+import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.ASTORE;
+import static org.objectweb.asm.Opcodes.CHECKCAST;
+import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.GETFIELD;
+import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.PUTFIELD;
+import static org.objectweb.asm.Opcodes.RETURN;
+
+public class Rewriter {
+  enum TypeKind {
+    IDENTITY, VALUE, ZERO_DEFAULT;
+
+    TypeKind max(TypeKind kind) {
+      return compareTo(kind) > 0 ? this: kind;
+    }
+  }
+  enum NullKind { NONNULL, NULLABLE }
+
+  record ClassData(String internalName, String superName, TypeKind typeKind, Set<String> dependencies, Map<String,FieldData> fieldDataMap, Map<String,MethodData> methodDataMap) { }
+  record FieldData(NullKind nullKind) {}
+  record MethodData(Map<Integer, NullKind> parameterMap) {}
+
+
+  private record Analysis(Map<String,ClassData> classDataMap) {
+    void dump() {
+      for(var classDataEntry: classDataMap.entrySet()) {
+        var typeName = classDataEntry.getKey();
+        var classData = classDataEntry.getValue();
+        System.out.println("type " + classData.typeKind + " " + typeName);
+        for(var fieldEntry: classData.fieldDataMap.entrySet()) {
+          var fieldName = fieldEntry.getKey();
+          var fieldData= fieldEntry.getValue();
+          System.out.println(" field " + fieldData.nullKind + " " + fieldName);
+        }
+        for(var methodEntry: classData.methodDataMap.entrySet()) {
+          var methodName = methodEntry.getKey();
+          var methodData = methodEntry.getValue();
+          System.out.println(" method " + methodName + " " + methodData.parameterMap);
+        }
+      }
+    }
+  }
+
+
+  private static final int ACC_VALUE = 0x0040;
+  private static final int ACC_IDENTITY = 0x0020;
+  private static final int ACC_PRIMITIVE = 0x0800;  // see jdk.internal.value.PrimitiveClass
+
+  private static final int ACONST_INIT = 203; // visitTypeInsn
+  private static final int WITHFIELD = 204; // visitFieldInsn
+
+  private static final class PreloadAttribute extends Attribute {
+    public List<String> classes ;
+
+    public PreloadAttribute(List<String> classes) {
+      super("Preload");
+      this.classes = classes;
+    }
+
+    public PreloadAttribute() {
+      this(null);
+    }
+
+    @Override
+    protected Attribute read(ClassReader classReader, int offset, int length, char[] charBuffer, int codeOffset, Label[] labels) {
+      var classesCount = classReader.readUnsignedShort(offset);
+      offset += 2;
+      var classes = new ArrayList<String>();
+      for(var i = 0; i < classesCount; i++) {
+        var clazz = classReader.readClass(offset, charBuffer);
+        classes.add(clazz);
+        offset += 2;
+      }
+      return new PreloadAttribute(classes);
+    }
+
+    @Override
+    protected ByteVector write(ClassWriter classWriter, byte[] code, int codeLength, int maxStack, int maxLocals) {
+      var byteVector = new ByteVector();
+      byteVector.putShort(classes.size());
+      for (var clazz : classes) {
+        byteVector.putShort(classWriter.newClass(clazz));
+      }
+      return byteVector;
+    }
+  }
+
+  private static Analysis analyze(List<Path> classes) throws IOException {
+    var classDataMap = new HashMap<String, ClassData>();
+    for (var path : classes) {
+      try (var input = Files.newInputStream(path)) {
+        var bytecode = input.readAllBytes();
+        System.out.println("analyze " + path);
+        var classDataOpt = analyze(bytecode);
+        classDataOpt.ifPresent(classData -> classDataMap.put(classData.internalName, classData));
+      }
+    }
+
+    return new Analysis(classDataMap);
+  }
+
+  private static Optional<NullKind> nullKind(String descriptor) {
+    return switch (descriptor) {
+      case "Lcom/github/forax/civilizer/runtime/NonNull;" -> Optional.of(NullKind.NONNULL);
+      case "Lcom/github/forax/civilizer/runtime/Nullable;" -> Optional.of(NullKind.NULLABLE);
+      default -> Optional.empty();
+    };
+  }
+
+  private static Optional<ClassData> analyze(byte[] buffer) {
+    var fieldDataMap = new HashMap<String, FieldData>();
+    var methodDataMap = new HashMap<String, MethodData>();
+
+    var cv = new ClassVisitor(ASM9) {
+      private String internalName;
+      private String superName;
+      private TypeKind typeKind;
+
+      @Override
+      public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        internalName = name;
+        this.superName = superName;
+        typeKind = TypeKind.IDENTITY;
+      }
+
+      @Override
+      public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        // System.out.println("class.visitAnnotation: descriptor = " + descriptor);
+        switch (descriptor) {
+          case "Lcom/github/forax/civilizer/runtime/Value;" -> {
+            typeKind = typeKind.max(TypeKind.VALUE);
+          }
+          case "Lcom/github/forax/civilizer/runtime/ZeroDefault;" -> {
+            typeKind = typeKind.max(TypeKind.ZERO_DEFAULT);
+          }
+          default -> {}
+        }
+        return null;
+      }
+
+      @Override
+      public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
+        return new FieldVisitor(ASM9) {
+          @Override
+          public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+            // System.out.println("field.visitTypeAnnotation: descriptor = " + descriptor);
+            nullKind(descriptor).ifPresent(nullKind -> fieldDataMap.put(fieldName + "." + fieldDescriptor, new FieldData(nullKind)));
+            return null;
+          }
+        };
+      }
+
+      @Override
+      public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        var parameterMap = new HashMap<Integer, NullKind>();
+        methodDataMap.put(methodName + methodDescriptor, new MethodData(parameterMap));
+        return new MethodVisitor(ASM9) {
+          private int parameterDelta; // number of synthetic parameters at the beginning of the method
+
+          @Override
+          public void visitAnnotableParameterCount(int parameterCount, boolean visible) {
+            parameterDelta = Type.getArgumentTypes(methodDescriptor).length - parameterCount;
+          }
+
+          @Override
+          public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+            var typeReference = new TypeReference(typeRef);
+            int parameter;
+            switch (typeReference.getSort()) {
+              case TypeReference.METHOD_FORMAL_PARAMETER -> parameter = parameterDelta + typeReference.getFormalParameterIndex();
+              case TypeReference.METHOD_RETURN -> parameter = -1;
+              default -> {
+                return null;
+              }
+            }
+            //System.out.println("parameter = " + parameter + ", descriptor = " + descriptor);
+            nullKind(descriptor).ifPresent(nullKind -> parameterMap.put(parameter, nullKind));
+            return null;
+          }
+        };
+      }
+    };
+
+    var reader = new ClassReader(buffer);
+    if ((reader.getAccess() & ACC_VALUE) != 0) {  // do not rewrite value class, ASM is not ready for this
+      return Optional.empty();
+    }
+    var dependencies = new HashSet<String>();
+    var dependencyVisitor = dependencyCollectorAdapter(dependencies, cv);
+    reader.accept(dependencyVisitor,0);
+    return Optional.of(new ClassData(cv.internalName, cv.superName, cv.typeKind, dependencies, fieldDataMap, methodDataMap));
+  }
+
+  private static ClassVisitor dependencyCollectorAdapter(HashSet<String> dependencies, ClassVisitor cv) {
+    return new ClassRemapper(cv, new Remapper() {
+      @Override
+      public String map(String internalName) {
+        dependencies.add(internalName);
+        return internalName;
+      }
+    });
+  }
+
+  private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
+    for(var path: classes) {
+      try(var input = Files.newInputStream(path)) {
+        System.out.println("rewrite " + path);
+        var data = rewrite(input.readAllBytes(), analysis);
+        if (data.isPresent()) {
+          Files.write(path, data.orElseThrow());
+        } else {
+          System.out.println("  skip rewrite " + path);
+        }
+      }
+    }
+  }
+
+  private static Optional<byte[]> rewrite(byte[] buffer, Analysis analysis) {
+    var reader = new ClassReader(buffer);
+    var classDataMap = analysis.classDataMap;
+    var classData = classDataMap.get(reader.getClassName());
+    if (classData == null) {  // analysis is not available
+      return Optional.empty();
+    }
+    var dependencies = classData.dependencies;
+    var fieldDataMap = classData.fieldDataMap;
+    var methodDataMap = classData.methodDataMap;
+
+    var writer = new ClassWriter(reader, 0);
+    reader.accept(
+        new ClassVisitor(ASM9, writer) {
+          @Override
+          public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+            var kind = classData.typeKind;
+            switch (kind) {
+              case IDENTITY -> {}
+              case VALUE -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE;
+              case ZERO_DEFAULT -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
+            }
+            super.visit(version, access, name, signature, superName, interfaces);
+          }
+
+          @Override
+          public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
+            var type = Type.getType(fieldDescriptor);
+            var typeSort = type.getSort();
+            if (typeSort == Type.OBJECT /* || typeSort == Type.ARRAY*/) {
+              var nullKind = Optional.ofNullable(fieldDataMap.get(fieldName + "." + fieldDescriptor)).map(FieldData::nullKind).orElse(NullKind.NULLABLE);
+              var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+              System.out.println("  rewrite field " + fieldName + "." + fieldDescriptor + " " + nullKind + " " + typeKind);
+              if (nullKind == NullKind.NONNULL && typeKind == TypeKind.ZERO_DEFAULT) {
+                fieldDescriptor = "Q" + fieldDescriptor.substring(1);
+              }
+            }
+            return super.visitField(access, fieldName, fieldDescriptor, signature, value);
+          }
+
+          @Override
+          public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+            var rewriteConstructor = classData.typeKind != TypeKind.IDENTITY && methodName.equals("<init>");
+            MethodVisitor mv;
+            if (rewriteConstructor) {
+              mv = super.visitMethod(ACC_STATIC | access, "<vnew>", methodDescriptor.substring(0, methodDescriptor.length() - 1) + "L" + classData.internalName + ";", signature, exceptions);
+            } else {
+              mv = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
+            }
+            var methodData = methodDataMap.get(methodName + methodDescriptor);
+            Map<Integer, NullKind> parameterMap;
+            if (methodData != null && !(parameterMap = methodData.parameterMap).isEmpty()) {
+              mv = preconditionsAdapter(methodDescriptor, classDataMap, parameterMap, mv);
+            }
+            mv = newToVNewAdapter(classDataMap, mv);
+            mv = fieldAccessAdapter(classDataMap, mv);
+            mv = recordObjectMethodsAdapter(classData, mv);
+            if (rewriteConstructor) {
+              var _this = Arrays.stream(Type.getArgumentTypes(methodDescriptor)).mapToInt(Type::getSize).sum();
+              mv = initToFactoryAdapter(classData.internalName, classData.superName, _this, mv);
+            }
+            return mv;
+          }
+
+          @Override
+          public void visitInnerClass(String name, String outerName, String innerName, int access) {
+            var typeKind = Optional.ofNullable(classDataMap.get(name)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+            switch (typeKind) {
+              case IDENTITY -> access |= ACC_IDENTITY;
+              case VALUE -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE;
+              case ZERO_DEFAULT -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
+            }
+            super.visitInnerClass(name, outerName, innerName, access);
+          }
+
+          @Override
+          public void visitEnd() {
+            var classes = dependencies.stream()
+                .filter(internalName -> !classData.internalName.equals(internalName))
+                .filter(internalName -> Optional.ofNullable(classDataMap.get(internalName)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY) != TypeKind.IDENTITY)
+                .toList();
+            if (!classes.isEmpty()) {
+              super.visitAttribute(new PreloadAttribute(classes));
+            }
+          }
+        }, 0);
+
+    return Optional.of(writer.toByteArray());
+  }
+
+  private static MethodVisitor preconditionsAdapter(String methodDescriptor, Map<String,ClassData> classDataMap, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
+    return new MethodVisitor(ASM9,  mv) {
+      @Override
+      public void visitCode() {
+        var types = Type.getArgumentTypes(methodDescriptor);
+        var slot = 0;
+        for(var i = 0; i < types.length; i++) {
+          var type = types[i];
+          var typeSort = type.getSort();
+          if (typeSort != Type.OBJECT /*&& typeSort != Type.ARRAY FIXME*/) {
+            continue;
+          }
+          var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
+          if (parameterNullKind == NullKind.NULLABLE) {
+            continue;
+          }
+          var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+          mv.visitVarInsn(ALOAD, slot);
+          switch (typeKind) {
+            case IDENTITY, VALUE -> mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
+            case ZERO_DEFAULT -> mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
+          }
+          mv.visitVarInsn(ASTORE, slot);
+          slot += type.getSize();
+        }
+        super.visitCode();
+      }
+    };
+  }
+
+  private static MethodVisitor initToFactoryAdapter(String internalName, String superName, int _this, MethodVisitor mv) {
+    return new MethodVisitor(ASM9, mv) {
+      private boolean firstALOAD0 = true;
+
+      @Override
+      public void visitVarInsn(int opcode, int varIndex) {
+        if (opcode == ALOAD && varIndex == 0) {
+          if (firstALOAD0) {  // skip first ALOAD_0
+            firstALOAD0 = false;
+            return;
+          }
+          super.visitVarInsn(ALOAD, _this);
+          return;
+        }
+        super.visitVarInsn(opcode, varIndex - 1);
+      }
+
+      @Override
+      public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        if (opcode == INVOKESPECIAL && name.equals("<init>")) {
+          if (owner.equals(superName) && descriptor.equals("()V")) {  // super()
+            mv.visitTypeInsn(ACONST_INIT, internalName);
+            mv.visitVarInsn(ASTORE, _this);
+            return;
+          }
+          if (owner.equals(internalName)) { // this(...)
+            //TODO does not work if this(...) contains a new ont itself !
+            mv.visitMethodInsn(INVOKESTATIC, internalName, "<vnew>", descriptor.substring(0, descriptor.length() - 1) + "L" + internalName + ";", false);
+            mv.visitVarInsn(ASTORE, _this);
+            return;
+          }
+        }
+        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+      }
+
+      @Override
+      public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        if (opcode == PUTFIELD && owner.equals(internalName)) {
+          mv.visitFieldInsn(WITHFIELD, owner, name, descriptor);
+          mv.visitVarInsn(ASTORE, _this);
+          return;
+        }
+        super.visitFieldInsn(opcode, owner, name, descriptor);
+      }
+
+      @Override
+      public void visitInsn(int opcode) {
+        if (opcode == RETURN) {
+          mv.visitVarInsn(ALOAD, _this);
+          mv.visitInsn(ARETURN);
+          return;
+        }
+        super.visitInsn(opcode);
+      }
+    };
+  }
+
+  private static MethodVisitor newToVNewAdapter(Map<String, ClassData> classDataMap, MethodVisitor mv) {
+    return new MethodVisitor(ASM9, mv) {
+      private boolean removeDUP;
+
+      @Override
+      public void visitTypeInsn(int opcode, String type) {
+        if (opcode == NEW) {
+          var typeKind = Optional.ofNullable(classDataMap.get(type)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+          if (typeKind != TypeKind.IDENTITY) {
+            removeDUP = true;
+            return;  // skip NEW
+          }
+        }
+        super.visitTypeInsn(opcode, type);
+      }
+
+      @Override
+      public void visitInsn(int opcode) {
+        if (opcode == DUP && removeDUP) {
+          removeDUP = false;
+          return;  // skip DUP
+        }
+        super.visitInsn(opcode);
+      }
+
+      @Override
+      public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        var typeKind = Optional.ofNullable(classDataMap.get(owner)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+        if (opcode == INVOKESPECIAL && name.equals("<init>") && typeKind != TypeKind.IDENTITY) {
+          super.visitMethodInsn(INVOKESTATIC, owner, "<vnew>", descriptor.substring(0, descriptor.length() - 1) + "L" + owner + ";", false);
+          return;
+        }
+        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+      }
+    };
+  }
+
+  private static final Handle BSM_GETFIELD, BSM_PUTFIELD;
+
+  static {
+    var runtimeName = RT.class.getName().replace('.', '/');
+    BSM_GETFIELD = new Handle(H_INVOKESTATIC, runtimeName, "bsm_getfield",
+        "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
+        false);
+    BSM_PUTFIELD = new Handle(H_INVOKESTATIC, runtimeName, "bsm_putfield",
+        "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
+        false);
+  }
+
+  private static MethodVisitor fieldAccessAdapter(Map<String, ClassData> classDataMap, MethodVisitor mv) {
+    return new MethodVisitor(ASM9, mv) {
+      @Override
+      public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        var typeName = Type.getType(descriptor).getInternalName();
+        var typeKind = Optional.ofNullable(classDataMap.get(typeName)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+        if (typeKind != TypeKind.IDENTITY) {
+          switch (opcode) {
+            case GETFIELD -> {
+              visitInvokeDynamicInsn(name, "(L" + owner + ";)" + descriptor, BSM_GETFIELD);
+              return;
+            }
+            case PUTFIELD -> {
+              visitInvokeDynamicInsn(name, "(L" + owner + ";" + descriptor + ")V", BSM_PUTFIELD);
+              return;
+            }
+            default -> {}
+          }
+        }
+        super.visitFieldInsn(opcode, owner, name, descriptor);
+      }
+    };
+  }
+
+  private static MethodVisitor recordObjectMethodsAdapter(ClassData classData, MethodVisitor mv) {
+    return new MethodVisitor(ASM9, mv) {
+      @Override
+      public void visitInvokeDynamicInsn(String name, String descriptor, Handle bsmHandle, Object... bsmArguments) {
+        if (bsmHandle.getOwner().equals("java/lang/runtime/ObjectMethods") && classData.typeKind == TypeKind.ZERO_DEFAULT) {
+          var bsmRecord = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'), "bsm_record", bsmHandle.getDesc(), false);
+          mv.visitInvokeDynamicInsn(name, descriptor, bsmRecord, bsmArguments);
+          return;
+        }
+        super.visitInvokeDynamicInsn(name, descriptor, bsmHandle, bsmArguments);
+      }
+    };
+  }
+
+  public static void main(String[] args) throws IOException {
+    var folder = Path.of("target/classes");
+    List<Path> classes;
+    try(var paths = Files.walk(folder)) {
+      classes = paths
+          .filter(p -> p.toString().contains("demo") && p.toString().endsWith(".class"))
+          .toList();
+    }
+
+    var analysis = analyze(classes);
+    analysis.dump();
+    rewrite(classes, analysis);
+  }
+}
