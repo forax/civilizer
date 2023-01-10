@@ -20,6 +20,7 @@ public interface Demo {
     System.out.println(age);
     System.out.println(age.getClass().isValue());
     System.out.println(RT.isZeroDefault(age.getClass()));
+    System.out.println(RT.defaultValue(age.getClass()));
 
     var container = new AgeContainer();
     System.out.println(container.age);

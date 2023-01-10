@@ -7,6 +7,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.TypeDescriptor;
+import java.lang.reflect.Array;
 import java.lang.runtime.ObjectMethods;
 
 public final class RT {
@@ -17,7 +18,6 @@ public final class RT {
   private static final int ACC_PRIMITIVE = 0x0800;  // see jdk.internal.value.PrimitiveClass
 
   public static boolean isZeroDefault(Class<?> clazz) {
-    //jdk.internal.value.PrimitiveClass
     return (clazz.getModifiers() & ACC_PRIMITIVE) != 0;
   }
 
@@ -27,6 +27,15 @@ public final class RT {
 
   public static Class<?> asSecondaryType(Class<?> type) {
     return MethodType.fromMethodDescriptorString("()Q" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T defaultValue(Class<T> type) {
+    if (isZeroDefault(type)) {
+      var componentType = asSecondaryType(type);
+      return (T) Array.get(Array.newInstance(componentType,1), 0);
+    }
+    return null;
   }
 
   public static CallSite bsm_getfield(Lookup lookup, String name, MethodType methodType) throws NoSuchFieldException, IllegalAccessException {
