@@ -36,3 +36,20 @@ Otherwise, a value type (zero-default or not) works like any object.
 
 Compared to a classical @NonNull, this one has some teeth, when declared on a parameter of a method, a nullcheck is done at each call. When declared on a field only non-null zero-default is enforced (because in the other case null is a valid default value when the field is not yet initialized).
 This behavior is i believe the same as in Kotlin.
+
+
+## How to build it
+
+You need the latest early access build of Valhalla [jdk.java.net/valhalla/](https://jdk.java.net/valhalla/)
+and then launch maven
+```bash
+export JAVA_HOME=/path/to/jdk
+mvn package
+```
+
+It will compile, rewrite the bytecode of any packages containing `demo` and run the tests.
+
+## How to run it
+```bash
+  $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes com/github/forax/civilizer/demo/Demo
+```
