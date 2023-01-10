@@ -1,22 +1,24 @@
 package com.github.forax.civilizer.demo;
 
-import com.github.forax.civilizer.demo.IdentityTest.FooContainer;
+import com.github.forax.civilizer.demo.ValueTest.FooContainer;
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
 import com.github.forax.civilizer.runtime.Value;
+import com.github.forax.civilizer.runtime.ZeroDefault;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ValueTest {
-  @Value record Foo(int value) {}
+public class ZeroDefaultValueTest {
+  @ZeroDefault @Value record Foo(int value) {}
 
   static class FooContainer {
     @Nullable Foo fooNullable;
@@ -24,29 +26,32 @@ public class ValueTest {
   }
 
   @Test
-  public void valueClass() {
-    assertTrue(Foo.class.isValue());
+  public void zeroDefaultValueClass() {
+    assertAll(
+        () -> assertTrue(Foo.class.isValue()),
+        () -> assertTrue(RT.isZeroDefault(Foo.class))
+    );
   }
 
   @Test
   public void defaultValue() {
-    assertNull(RT.defaultValue(Foo.class));
+    assertEquals(new Foo(0), RT.defaultValue(Foo.class));
   }
 
   @Test
   public void container() {
-     var container = new FooContainer();
-     assertAll(
-         () -> assertNull(container.fooNullable),
-         () -> assertNull(container.fooNonNull)
-     );
+    var container = new FooContainer();
+    assertAll(
+        () -> assertNull(container.fooNullable),
+        () -> assertSame(new Foo(0), container.fooNonNull)
+    );
   }
 
   @Test
   public void containerWrite() {
     var container = new FooContainer();
     container.fooNullable = null;
-    container.fooNonNull = null;
+    assertThrows(NullPointerException.class, () -> container.fooNonNull = null);
   }
 
   @Test
