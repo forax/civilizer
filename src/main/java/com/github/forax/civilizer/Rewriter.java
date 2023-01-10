@@ -20,6 +20,7 @@ import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 
 import java.io.IOException;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ALOAD;
@@ -347,6 +349,8 @@ public class Rewriter {
 
   private static MethodVisitor preconditionsAdapter(String methodDescriptor, Map<String,ClassData> classDataMap, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
     return new MethodVisitor(ASM9,  mv) {
+      private int maxLocals = -1;
+
       @Override
       public void visitCode() {
         var types = Type.getArgumentTypes(methodDescriptor);
@@ -354,23 +358,31 @@ public class Rewriter {
         for(var i = 0; i < types.length; i++) {
           var type = types[i];
           var typeSort = type.getSort();
-          if (typeSort != Type.OBJECT /*&& typeSort != Type.ARRAY FIXME*/) {
-            continue;
+          if (typeSort == Type.OBJECT /*|| typeSort == Type.ARRAY FIXME*/) {
+            var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
+            if (parameterNullKind != NullKind.NULLABLE) {
+              var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+              mv.visitVarInsn(ALOAD, slot);
+              switch (typeKind) {
+                case IDENTITY, VALUE -> mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
+                case ZERO_DEFAULT -> mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
+              }
+              mv.visitVarInsn(ASTORE, slot);
+              maxLocals = slot;
+            }
           }
-          var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
-          if (parameterNullKind == NullKind.NULLABLE) {
-            continue;
-          }
-          var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
-          mv.visitVarInsn(ALOAD, slot);
-          switch (typeKind) {
-            case IDENTITY, VALUE -> mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-            case ZERO_DEFAULT -> mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
-          }
-          mv.visitVarInsn(ASTORE, slot);
           slot += type.getSize();
         }
         super.visitCode();
+      }
+
+      @Override
+      public void visitMaxs(int maxStack, int maxLocals) {
+        if (maxLocals != -1) {
+          maxStack = Math.max(maxStack, 2);
+          maxLocals = Math.max(maxLocals, this.maxLocals);
+        }
+        super.visitMaxs(maxStack, maxLocals);
       }
     };
   }
@@ -519,14 +531,21 @@ public class Rewriter {
     };
   }
 
-  public static void main(String[] args) throws IOException {
-    var folder = Path.of("target/classes");
-    List<Path> classes;
+  private static List<Path> classes(Path folder, String including) throws IOException {
+    if (!Files.exists(folder)) {
+      return List.of();
+    }
     try(var paths = Files.walk(folder)) {
-      classes = paths
-          .filter(p -> p.toString().contains("demo") && p.toString().endsWith(".class"))
+      return paths
+          .filter(p -> p.toString().contains(including) && p.toString().endsWith(".class"))
           .toList();
     }
+  }
+
+  public static void main(String[] args) throws IOException {
+    var main = classes(Path.of("target/classes"), "demo");
+    var test = classes(Path.of("target/test-classes"), "demo");
+    List<Path> classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);
     analysis.dump();
