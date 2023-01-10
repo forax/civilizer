@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.pristine;
+package com.github.forax.civilizer.attic;
 
 /*public class DemoTest {
   primitive value record Age(int i) {}
