@@ -317,7 +317,7 @@ public class Rewriter {
             mv = recordObjectMethodsAdapter(classData, mv);
             if (rewriteConstructor) {
               var _this = Arrays.stream(Type.getArgumentTypes(methodDescriptor)).mapToInt(Type::getSize).sum();
-              mv = initToFactoryAdapter(classData.internalName, classData.superName, _this, mv);
+              mv = initToFactoryAdapter(classData.internalName, classData.superName, classDataMap, _this, mv);
             }
             return mv;
           }
@@ -394,7 +394,7 @@ public class Rewriter {
     };
   }
 
-  private static MethodVisitor initToFactoryAdapter(String internalName, String superName, int _this, MethodVisitor mv) {
+  private static MethodVisitor initToFactoryAdapter(String internalName, String superName, Map<String, ClassData> classDataMap, int _this, MethodVisitor mv) {
     return new MethodVisitor(ASM9, mv) {
       private boolean firstALOAD0 = true;
 
@@ -432,6 +432,13 @@ public class Rewriter {
       @Override
       public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
         if (opcode == PUTFIELD && owner.equals(internalName)) {
+          var descType = Type.getType(descriptor);
+          if (descType.getSort() == Type.OBJECT /*|| descType.getSort() == Type.ARRAY*/) {
+            var typeKind = Optional.ofNullable(classDataMap.get(descType.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+            if (typeKind == TypeKind.ZERO_DEFAULT) {
+              descriptor = "Q" + descriptor.substring(1);
+            }
+          }
           mv.visitFieldInsn(WITHFIELD, owner, name, descriptor);
           mv.visitVarInsn(ASTORE, _this);
           return;
@@ -504,6 +511,10 @@ public class Rewriter {
     return new MethodVisitor(ASM9, mv) {
       @Override
       public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        if (opcode == WITHFIELD) { // short circuit because Type.getType() does not support Q-types
+          super.visitFieldInsn(opcode, owner, name, descriptor);
+          return;
+        }
         var typeName = Type.getType(descriptor).getInternalName();
         var typeKind = Optional.ofNullable(classDataMap.get(typeName)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
         if (typeKind != TypeKind.IDENTITY) {
