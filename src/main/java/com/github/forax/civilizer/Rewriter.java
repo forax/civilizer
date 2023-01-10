@@ -45,6 +45,7 @@ import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.POP;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 
@@ -362,12 +363,18 @@ public class Rewriter {
             var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
             if (parameterNullKind != NullKind.NULLABLE) {
               var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
-              mv.visitVarInsn(ALOAD, slot);
               switch (typeKind) {
-                case IDENTITY, VALUE -> mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                case ZERO_DEFAULT -> mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
+                case IDENTITY, VALUE -> {
+                  mv.visitVarInsn(ALOAD, slot);
+                  mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
+                  mv.visitInsn(POP);
+                }
+                case ZERO_DEFAULT -> {
+                  mv.visitVarInsn(ALOAD, slot);
+                  mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
+                  mv.visitVarInsn(ASTORE, slot);
+                }
               }
-              mv.visitVarInsn(ASTORE, slot);
               maxLocals = slot;
             }
           }
