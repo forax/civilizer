@@ -1,5 +1,6 @@
 package com.github.forax.civilizer.demo;
 
+import com.github.forax.civilizer.demo.IdentityTest.Foo;
 import com.github.forax.civilizer.demo.IdentityTest.FooContainer;
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.ref.WeakReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -86,6 +88,13 @@ public class ValueTest {
     }
 
     Bar.bar(42L, null);  // Ok !
+  }
+
+  @Test
+  public void valueIdentityHashCode() {
+    assertEquals(
+        System.identityHashCode(new Foo(72)),
+        System.identityHashCode(new Foo(72)));
   }
 
   @Test

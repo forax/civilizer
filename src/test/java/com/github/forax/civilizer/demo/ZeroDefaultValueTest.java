@@ -1,5 +1,6 @@
 package com.github.forax.civilizer.demo;
 
+import com.github.forax.civilizer.demo.ValueTest.Foo;
 import com.github.forax.civilizer.demo.ValueTest.FooContainer;
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
@@ -91,6 +92,13 @@ public class ZeroDefaultValueTest {
     }
 
     Bar.bar(42L, null);  // Ok !
+  }
+
+  @Test
+  public void valueIdentityHashCode() {
+    assertEquals(
+        System.identityHashCode(new Foo(72)),
+        System.identityHashCode(new Foo(72)));
   }
 
   @Test
