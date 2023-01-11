@@ -36,7 +36,10 @@ public class ZeroDefaultValueTest {
 
   @Test
   public void defaultValue() {
-    assertEquals(new Foo(0), RT.defaultValue(Foo.class));
+    assertAll(
+        () -> assertNull(RT.defaultValue(Foo.class)),
+        () -> assertEquals(new Foo(0), RT.defaultValue(RT.asSecondaryType(Foo.class)))
+    );
   }
 
   @Test

@@ -31,12 +31,18 @@ public final class RT {
 
   @SuppressWarnings("unchecked")
   public static <T> T defaultValue(Class<T> type) {
-    if (isZeroDefault(type)) {
-      var componentType = asSecondaryType(type);
-      return (T) Array.get(Array.newInstance(componentType,1), 0);
-    }
-    return null;
+    return (T) Array.get(Array.newInstance(type,1), 0);
   }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T[] newNonNullArray(Class<T> component, int length) {
+    if (component.isPrimitive()) {
+      throw new IllegalArgumentException("component is primitive");
+    }
+    return (T[]) Array.newInstance(asSecondaryType(component), length);
+  }
+
+  // bootstrap methods
 
   public static CallSite bsm_getfield(Lookup lookup, String name, MethodType methodType) throws NoSuchFieldException, IllegalAccessException {
     var owner = methodType.parameterType(0);
