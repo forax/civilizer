@@ -1,7 +1,5 @@
 package com.github.forax.civilizer.demo;
 
-import com.github.forax.civilizer.demo.IdentityTest.Foo;
-import com.github.forax.civilizer.demo.IdentityTest.FooContainer;
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
