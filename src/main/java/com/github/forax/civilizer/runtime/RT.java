@@ -22,10 +22,16 @@ public final class RT {
   }
 
   /*public static Class<?> asPrimaryType(Class<?> type) {
+    if (type.isPrimitive()) {
+      throw new IllegalArgumentException("component is primitive");
+    }
     return MethodType.fromMethodDescriptorString("()L" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
   }*/
 
   public static Class<?> asSecondaryType(Class<?> type) {
+    if (type.isPrimitive()) {
+      throw new IllegalArgumentException("component is primitive");
+    }
     return MethodType.fromMethodDescriptorString("()Q" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
   }
 
@@ -36,9 +42,6 @@ public final class RT {
 
   @SuppressWarnings("unchecked")
   public static <T> T[] newNonNullArray(Class<T> component, int length) {
-    if (component.isPrimitive()) {
-      throw new IllegalArgumentException("component is primitive");
-    }
     return (T[]) Array.newInstance(asSecondaryType(component), length);
   }
 
