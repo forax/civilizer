@@ -364,16 +364,16 @@ public class Rewriter {
             if (parameterNullKind != NullKind.NULLABLE) {
               var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
               switch (typeKind) {
-                case IDENTITY, VALUE -> {
+                case IDENTITY, VALUE, ZERO_DEFAULT -> {
                   mv.visitVarInsn(ALOAD, slot);
                   mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
                   mv.visitInsn(POP);
                 }
-                case ZERO_DEFAULT -> {
-                  mv.visitVarInsn(ALOAD, slot);
-                  mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
-                  mv.visitVarInsn(ASTORE, slot);
-                }
+                //case ZERO_DEFAULT -> {
+                //  mv.visitVarInsn(ALOAD, slot);
+                //  mv.visitTypeInsn(CHECKCAST, "Q" + type.getDescriptor().substring(1));
+                //  mv.visitVarInsn(ASTORE, slot);
+                //}
               }
               maxLocals = slot;
             }
@@ -437,6 +437,7 @@ public class Rewriter {
             var typeKind = Optional.ofNullable(classDataMap.get(descType.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
             if (typeKind == TypeKind.ZERO_DEFAULT) {
               descriptor = "Q" + descriptor.substring(1);
+              mv.visitTypeInsn(CHECKCAST, descriptor);
             }
           }
           mv.visitFieldInsn(WITHFIELD, owner, name, descriptor);
