@@ -4,7 +4,9 @@ import java.io.IOException;
 
 public class AllRewriter {
   public static void main(String[] args) throws IOException {
-    //Rewriter.main(args);
+    System.out.println("--- value ---");
+    Rewriter.main(args);
+    System.out.println("--- parametric ---");
     VMRewriter.main(args);
   }
 }

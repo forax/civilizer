@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
@@ -39,12 +40,14 @@ import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ARETURN;
 import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.GETFIELD;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEINTERFACE;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.PUTFIELD;
 
 public class VMRewriter {
   record Signature(String desc) {
@@ -76,7 +79,7 @@ public class VMRewriter {
       false);
   private static final Handle BSM_NEW = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
       "bsm_new",
-      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
   private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
       "bsm_condy",
@@ -133,7 +136,7 @@ public class VMRewriter {
 
       @Override
       public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        System.out.println("method signature " + signature);
+        //System.out.println("method signature " + signature);
         if (signature != null) {
           methodData.put(name + descriptor, new Signature(signature));
         }
@@ -159,15 +162,16 @@ public class VMRewriter {
   private static byte[] rewrite(byte[] buffer, Analysis analysis) {
     var reader = new ClassReader(buffer);
     var internalName = reader.getClassName();
+    var supername = reader.getSuperName();
     var classDataMap = analysis.classDataMap;
-    var condyMap = analysis.classDataMap.get(internalName).condyMap;
+    var classData = analysis.classDataMap.get(internalName);
     var writer = new ClassWriter(reader, 0);
     var cv = new ClassVisitor(ASM9, writer) {
       @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
         if ((name.startsWith("$KP") || name.startsWith("$P"))) {
           var condyName = name.substring(1);
-          var condy = condyMap.get(condyName);
+          var condy = classData.condyMap.get(condyName);
           if (name.startsWith("$KP")) {
             // we also need accessors
             var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, name, "()Ljava/lang/Object;", null, null);
@@ -184,10 +188,32 @@ public class VMRewriter {
 
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        if (classData.signature != null && methodName.equals("<init>")) { // need to initialize the kiddy pool
+          var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
+          desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+          var mv = super.visitMethod(access, methodName, desc.descriptorString(), signature, exceptions);
+          return new MethodVisitor(ASM9, mv) {
+            @Override
+            public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+              if (opcode == INVOKESPECIAL && owner.equals(supername) && name.equals("<init>")) {
+                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                mv.visitVarInsn(ALOAD, 0);
+                var slot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;
+                mv.visitVarInsn(ALOAD, slot);
+                mv.visitFieldInsn(PUTFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                return;
+              }
+              super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+            }
+
+            @Override
+            public void visitMaxs(int maxStack, int maxLocals) {
+              super.visitMaxs(Math.max(maxStack, 2) , maxLocals + 1);
+            }
+          };
+        }
+
         var mv = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
-
-        System.out.println("visit " + methodName + methodDescriptor);
-
         return new MethodVisitor(ASM9, mv) {
           private String constant;
           private final ArrayDeque<Object> constantStack = new ArrayDeque<>();
@@ -206,7 +232,7 @@ public class VMRewriter {
             if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;")) {
               // record constant
               var constant = this.constant;
-              var condy =  condyMap.get(constant);
+              var condy =  classData.condyMap.get(constant);
               if (condy == null) {
                 throw new IllegalStateException("unknown constant pool constant " + constant);
               }
@@ -229,25 +255,39 @@ public class VMRewriter {
                 if (name.equals("<init>") && !methodName.equals("<init>") && (classSignature != null || methodSignature != null)) {
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));
-                  var methodConstant = methodSignature != null? constantStack.pop(): "";
-                  var classConstant = classSignature != null? constantStack.pop(): "";
-                  mv.visitInvokeDynamicInsn("new", desc.descriptorString(), BSM_NEW, classConstant, methodConstant);
+                  var constant = constantStack.pop();
+                  if (!(constant instanceof ConstantDynamic)) {
+                    mv.visitVarInsn(ALOAD, 0);
+                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                  }
+                  mv.visitInvokeDynamicInsn("new", desc.descriptorString(), BSM_NEW, constant);
                   return;
                 }
               }
               case INVOKESTATIC -> {
                 if (methodSignature != null) {
+                  var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   var constant = constantStack.pop();
-                  mv.visitInvokeDynamicInsn(name, descriptor, BSM_STATIC, Type.getObjectType(owner), constant);
+                  if (!(constant instanceof ConstantDynamic)) {
+                    mv.visitVarInsn(ALOAD, 0);
+                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                  }
+                  mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_STATIC, Type.getObjectType(owner), constant);
                   return;
                 }
               }
               case INVOKEVIRTUAL, INVOKEINTERFACE -> {
                 if (methodSignature != null) {
-                  mv.visitVarInsn(ALOAD, 0);
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
-                  desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                  desc = desc.insertParameterTypes(0, ClassDesc.ofInternalName(owner));
                   var constant = constantStack.pop();
+                  if (!(constant instanceof ConstantDynamic)) {
+                    mv.visitVarInsn(ALOAD, 0);
+                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                  }
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_VIRTUAL, constant);
                   return;
                 }
@@ -283,6 +323,15 @@ public class VMRewriter {
             super.visitEnd();
           }
         };
+      }
+
+      @Override
+      public void visitEnd() {
+        if (classData.signature != null) {  // parametric class
+          var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
+          fv.visitEnd();
+        }
+        super.visitEnd();
       }
     };
     reader.accept(cv, 0);
@@ -323,7 +372,7 @@ public class VMRewriter {
     List<Path> classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);
-    analysis.dump();
+    //analysis.dump();
     rewrite(classes, analysis);
   }
 }
