@@ -136,7 +136,7 @@ public class RT {
       // specialize descriptor
       var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
       var target = method.asType(specializedType).asType(type);
-      return new ConstantCallSite(method);
+      return new ConstantCallSite(target);
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
