@@ -3,7 +3,7 @@ package com.github.forax.civilizer.species;
 public class Demo {
   static class Foo<T> {
     private static final String $KP0 = "classData";
-    private static final String $KP1 = "list.get KP0; C0;";
+    private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "list.of KP1;";
     private static final String $KP3 = "species Lcom/github/forax/civilizer/species/Demo$Foo; KP2;";
     private static final String $KP4 = "linkage KP3; KP3; KP1;";

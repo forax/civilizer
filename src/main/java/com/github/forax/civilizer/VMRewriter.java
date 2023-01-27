@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.invoke.ConstantBootstraps;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.TypeDescriptor;
 import java.nio.file.Files;
@@ -85,6 +86,10 @@ public class VMRewriter {
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_PRIMITIVE = new Handle(H_INVOKESTATIC, ConstantBootstraps.class.getName().replace('.', '/'),
+      "primitiveClass",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Class;",
+      false);
 
   private static ClassData analyze(byte[] buffer) {
     var condyMap = new HashMap<String, ConstantDynamic>();
@@ -105,6 +110,7 @@ public class VMRewriter {
 
       private Object condyArgument(String arg) {
         return switch (arg.charAt(0)) {
+          case 'V', 'Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D' -> new ConstantDynamic(arg, "Ljava/lang/Class;", BSM_PRIMITIVE);
           case 'L' -> Type.getType(arg);
           case 'K', 'P' -> {
             var condy = condyMap.get(arg.substring(0, arg.length() - 1));
@@ -113,8 +119,7 @@ public class VMRewriter {
             }
             yield condy;
           }
-          case 'C' -> Integer.valueOf(arg.substring(1, arg.length() - 1));
-          default -> throw new IllegalStateException("unknown encoding for condy arg " + arg);
+          default -> Integer.valueOf(arg);
         };
       }
 
@@ -234,7 +239,7 @@ public class VMRewriter {
               var constant = this.constant;
               var condy =  classData.condyMap.get(constant);
               if (condy == null) {
-                throw new IllegalStateException("unknown constant pool constant " + constant);
+                throw new IllegalStateException("unknown constant pool constant '" + constant + "'");
               }
               var constantValue = constant.startsWith("P") ? condy : constant;
               constantStack.push(constantValue);
