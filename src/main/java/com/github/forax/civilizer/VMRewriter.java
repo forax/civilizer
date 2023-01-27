@@ -33,11 +33,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ANEWARRAY;
 import static org.objectweb.asm.Opcodes.ARETURN;
 import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.DUP;
@@ -80,6 +82,10 @@ public class VMRewriter {
       false);
   private static final Handle BSM_NEW = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
       "bsm_new",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      false);
+  private static final Handle BSM_NEW_ARRAY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_new_array",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
   private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
@@ -193,11 +199,12 @@ public class VMRewriter {
 
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        MethodVisitor delegate;
         if (classData.signature != null && methodName.equals("<init>")) { // need to initialize the kiddy pool
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
           desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
           var mv = super.visitMethod(access, methodName, desc.descriptorString(), signature, exceptions);
-          return new MethodVisitor(ASM9, mv) {
+          delegate = new MethodVisitor(ASM9, mv) {
             @Override
             public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
               if (opcode == INVOKESPECIAL && owner.equals(supername) && name.equals("<init>")) {
@@ -216,34 +223,34 @@ public class VMRewriter {
               super.visitMaxs(Math.max(maxStack, 2) , maxLocals + 1);
             }
           };
+        } else {
+          delegate = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
         }
 
-        var mv = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
-        return new MethodVisitor(ASM9, mv) {
-          private String constant;
-          private final ArrayDeque<Object> constantStack = new ArrayDeque<>();
+        return new MethodVisitor(ASM9, delegate) {
+          private String ldcConstant;
+          private Object constantValue;
           private boolean removeDUP;
 
           @Override
           public void visitLdcInsn(Object value) {
             if (value instanceof String s) {
-              constant = s;
+              ldcConstant = s;
             }
             super.visitLdcInsn(value);
           }
 
           @Override
           public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-            if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;")) {
+            if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;") && ldcConstant != null) {
               // record constant
-              var constant = this.constant;
+              var constant = this.ldcConstant;
               var condy =  classData.condyMap.get(constant);
               if (condy == null) {
                 throw new IllegalStateException("unknown constant pool constant '" + constant + "'");
               }
-              var constantValue = constant.startsWith("P") ? condy : constant;
-              constantStack.push(constantValue);
-              this.constant = null;
+              constantValue = constant.startsWith("P") ? condy : constant;;
+              ldcConstant = null;
               super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
               return;
             }
@@ -254,13 +261,15 @@ public class VMRewriter {
             var methodSignature = Optional.ofNullable(classDataMap.get(owner))
                 .flatMap(classData -> Optional.ofNullable(classData.methodData.get(name + descriptor)))
                 .orElse(null);
+            var specializeable = classSignature != null || methodSignature != null;
 
             switch (opcode) {
               case INVOKESPECIAL -> {
-                if (name.equals("<init>") && !methodName.equals("<init>") && (classSignature != null || methodSignature != null)) {
+                if (specializeable && constantValue != null) {
+                  var constant = constantValue;
+                  constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));
-                  var constant = constantStack.pop();
                   if (!(constant instanceof ConstantDynamic)) {
                     mv.visitVarInsn(ALOAD, 0);
                     mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
@@ -271,9 +280,10 @@ public class VMRewriter {
                 }
               }
               case INVOKESTATIC -> {
-                if (methodSignature != null) {
+                if (specializeable && constantValue != null) {
+                  var constant = constantValue;
+                  constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
-                  var constant = constantStack.pop();
                   if (!(constant instanceof ConstantDynamic)) {
                     mv.visitVarInsn(ALOAD, 0);
                     mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
@@ -284,10 +294,11 @@ public class VMRewriter {
                 }
               }
               case INVOKEVIRTUAL, INVOKEINTERFACE -> {
-                if (methodSignature != null) {
+                if (specializeable && constantValue != null) {
+                  var constant = constantValue;
+                  constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.insertParameterTypes(0, ClassDesc.ofInternalName(owner));
-                  var constant = constantStack.pop();
                   if (!(constant instanceof ConstantDynamic)) {
                     mv.visitVarInsn(ALOAD, 0);
                     mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
@@ -304,9 +315,25 @@ public class VMRewriter {
 
           @Override
           public void visitTypeInsn(int opcode, String type) {
-            if (opcode == NEW) {
-              removeDUP = true;
-              return;  // skip NEW
+            switch (opcode) {
+              case NEW -> {
+                removeDUP = true;
+                return;  // skip NEW
+              }
+              case ANEWARRAY -> {
+                if (constantValue != null) {
+                  var constant = constantValue;
+                  constantValue = null;
+                  var desc = MethodTypeDesc.of(ClassDesc.ofInternalName(type).arrayType(), ConstantDescs.CD_int);
+                  if (!(constant instanceof ConstantDynamic)) {
+                    mv.visitVarInsn(ALOAD, 0);
+                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                  }
+                  mv.visitInvokeDynamicInsn("newArray", desc.descriptorString(), BSM_NEW_ARRAY, constant);
+                  return;
+                }
+              }
             }
             super.visitTypeInsn(opcode, type);
           }
@@ -322,8 +349,8 @@ public class VMRewriter {
 
           @Override
           public void visitEnd() {
-            if (!constantStack.isEmpty()) {
-              throw new IllegalStateException("in method " + internalName + "." + methodName + methodDescriptor + ", non empty constant stack " +constantStack);
+            if (constantValue != null) {
+              throw new IllegalStateException("in method " + internalName + "." + methodName + methodDescriptor + ", unbounded constant value " + constantValue);
             }
             super.visitEnd();
           }

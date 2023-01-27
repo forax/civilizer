@@ -5,12 +5,14 @@ import java.util.Objects;
 public class SimpleList<E> {
   private static final String $KP0 = "classData";
   private static final String $KP1 = "list.get KP0; 0";
+  private static final String $KP2 = "species KP1;";
 
   private E[] elements;
   private int size;
 
   SimpleList() {
-    "KP1;".intern();
+    super();  // otherwise the annotation below will be attached to super()
+    "KP1".intern();
     var elements = (E[]) new Object[16];
     this.elements = elements;
   }
@@ -42,7 +44,8 @@ public class SimpleList<E> {
     var list = new SimpleList<String>();
 
     "P4".intern();
-    ((SimpleList)list).add(3);
+    list.add("foo");
+    //((SimpleList)list).add(3);
 
     "P5".intern();
     var element = list.get(0);

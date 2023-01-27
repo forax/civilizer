@@ -114,11 +114,12 @@ public class RT {
     }
   }
 
-  private static final MethodHandle BSM_NEW;
+  private static final MethodHandle BSM_NEW, BSM_NEW_ARRAY;
   static {
     var lookup = MethodHandles.lookup();
     try {
       BSM_NEW = lookup.findStatic(RT.class, "bsm_new", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
+      BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
@@ -154,6 +155,22 @@ public class RT {
     if (constant instanceof String kiddyPoolRef) {
       var bsmNew = MethodHandles.insertArguments(BSM_NEW, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
       return new InliningCache(type, lookup, bsmNew, kiddyPoolRef);
+    }
+
+    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+  }
+
+  public static CallSite bsm_new_array(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
+    System.out.println("bsm_new_array " + type + " " + constant);
+
+    if (constant instanceof Species species) {
+      var newArray = MethodHandles.arrayConstructor(species.raw().arrayType());
+      var target = newArray.asType(type);
+      return new ConstantCallSite(target);
+    }
+    if (constant instanceof String kiddyPoolRef) {
+      var bsmNewArray = MethodHandles.insertArguments(BSM_NEW_ARRAY, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
+      return new InliningCache(type, lookup, bsmNewArray, kiddyPoolRef);
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
