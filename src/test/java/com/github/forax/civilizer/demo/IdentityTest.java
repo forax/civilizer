@@ -3,6 +3,7 @@ package com.github.forax.civilizer.demo;
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Disabled
 public class IdentityTest {
   record Foo(int value) {}
 

@@ -18,6 +18,19 @@ import org.objectweb.asm.TypePath;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.Interpreter;
+import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
+import org.objectweb.asm.tree.analysis.Value;
 
 import java.io.IOException;
 import java.lang.invoke.MethodType;
@@ -33,14 +46,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ARETURN;
 import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.ASTORE;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.DUP_X1;
 import static org.objectweb.asm.Opcodes.GETFIELD;
+import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
@@ -361,7 +377,7 @@ public class Rewriter {
           var typeSort = type.getSort();
           if (typeSort == Type.OBJECT /*|| typeSort == Type.ARRAY FIXME*/) {
             var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
-            if (parameterNullKind != NullKind.NULLABLE) {
+            if (parameterNullKind == NullKind.NONNULL) {
               var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
               switch (typeKind) {
                 case IDENTITY, VALUE, ZERO_DEFAULT -> {
@@ -393,6 +409,200 @@ public class Rewriter {
       }
     };
   }
+
+  private static Map<Integer, Integer> parameterIndexMap(boolean isInstanceMethod, String descriptor) {
+    var map = new HashMap<Integer, Integer>();
+    var slot = isInstanceMethod? 1: 0;
+    var types = Type.getArgumentTypes(descriptor);
+    for (var i = 0; i < types.length; i++) {
+      var type = types[i];
+      map.put(slot, i);
+      slot += type.getSize();
+    }
+    return map;
+  }
+
+  /*
+  static class NullInterpreter extends Interpreter<NullInterpreter.NullValue> {
+    enum NullValue implements Value {
+      NONNULL,
+      NULLABLE,
+      SIZE2;
+
+      @Override
+      public int getSize() {
+        return this == SIZE2 ? 2 : 1;
+      }
+    }
+
+    NullInterpreter() {
+      super(ASM9);
+    }
+
+    private NullValue fieldValue(FieldInsnNode node) {
+      var fieldType = Type.getType(node.desc);
+      switch (fieldType.getSort()) {
+        case Type.OBJECT -> {}
+        case Type.ARRAY -> {
+          return NullValue.NULLABLE;
+        }
+        case Type.DOUBLE, Type.LONG -> {
+          return NullValue.SIZE2;
+        }
+        default -> {
+          return NullValue.NONNULL;
+        }
+      }
+      var classData = classDataMap.get(node.owner);
+      if (classData == null) {
+        return NullValue.NULLABLE;
+      }
+      var typeKind = classData.typeKind();
+      var fieldData = classData.fieldDataMap.get(node.name + node.desc);
+      return typeKind == TypeKind.ZERO_DEFAULT && fieldData.nullKind == NullKind.NONNULL
+          ? NullValue.NONNULL
+          : NullValue.NULLABLE;
+    }
+
+    @Override
+    public NullValue newParameterValue(boolean isInstanceMethod, int local, Type type) {
+      if (isInstanceMethod && local == 0) { // this
+        return NullValue.NONNULL;
+      }
+      return switch (type.getSort()) {
+        case Type.ARRAY -> NullValue.NULLABLE;
+        case Type.OBJECT -> {
+          var parameterIndex = parameterIndexMap.getOrDefault(local, -1);
+          yield parameterMap.getOrDefault(parameterIndex, NullKind.NULLABLE) == NullKind.NULLABLE
+              ? NullValue.NULLABLE
+              : NullValue.NONNULL;
+        }
+        case Type.LONG, Type.FLOAT -> NullValue.SIZE2;
+        default -> NullValue.NONNULL;
+      };
+    }
+
+    @Override
+    public NullValue newValue(Type type) {
+      if (type == null) { // uninitialized object
+        return NullValue.NONNULL;
+      }
+      if (type == Type.VOID_TYPE) {
+        return null;
+      }
+      switch (type.getSort()) {
+        case Type.OBJECT, Type.ARRAY -> {
+          return NullValue.NULLABLE;
+        }
+        case Type.DOUBLE, Type.LONG -> {
+          return NullValue.SIZE2;
+        }
+        default -> {
+          return NullValue.NONNULL;
+        }
+      }
+    }
+
+    @Override
+    public NullValue newOperation(AbstractInsnNode node) {
+      return switch (node.getOpcode()) {
+        case ACONST_NULL -> NullValue.NULLABLE;
+        case NEW -> NullValue.NONNULL;
+        case LCONST_0, LCONST_1, DCONST_0, DCONST_1 -> NullValue.SIZE2;
+        case GETSTATIC -> newValue(Type.getType(((FieldInsnNode) node).desc));
+        case LDC -> {
+          var value = ((LdcInsnNode) node).cst;
+          if (value instanceof Integer || value instanceof Float) {
+            yield NullValue.NONNULL;
+          }
+          if (value instanceof Long || value instanceof Double) {
+            yield NullValue.SIZE2;
+          }
+          yield NullValue.NONNULL;
+        }
+        default -> throw new AssertionError();
+      };
+    }
+
+    @Override
+    public NullValue copyOperation(AbstractInsnNode node, NullValue v) {
+      return v;
+    }
+
+    @Override
+    public NullValue unaryOperation(AbstractInsnNode node, NullValue v) {
+      return switch (node.getOpcode()) {
+        case LNEG, DNEG, I2L, I2D, L2D, F2L, F2D, D2L -> NullValue.SIZE2;
+        case ARETURN, CHECKCAST -> v;
+        case GETFIELD -> fieldValue((FieldInsnNode) node);
+        default -> NullValue.NONNULL;
+      };
+    }
+
+    @Override
+    public NullValue binaryOperation(AbstractInsnNode node, NullValue v1, NullValue v2) {
+      return switch (node.getOpcode()) {
+        case LALOAD,
+            DALOAD,
+            LADD,
+            DADD,
+            LSUB,
+            DSUB,
+            LMUL,
+            DMUL,
+            LDIV,
+            DDIV,
+            LREM,
+            DREM,
+            LSHL,
+            LSHR,
+            LUSHR,
+            LAND,
+            LOR,
+            LXOR -> NullValue.SIZE2;
+        case AALOAD -> NullValue.NULLABLE;
+        default -> NullValue.NONNULL;
+      };
+    }
+
+    @Override
+    public NullValue ternaryOperation(
+        AbstractInsnNode node, NullValue v1, NullValue v2, NullValue v3) {
+      return NullValue.NONNULL;
+    }
+
+    @Override
+    public NullValue naryOperation(AbstractInsnNode node, List<? extends NullValue> list) {
+      return switch (node.getOpcode()) {
+        case INVOKEDYNAMIC -> switch (Type.getReturnType(((InvokeDynamicInsnNode) node).desc).getSort()) {
+          case Type.OBJECT -> NullValue.NULLABLE;
+          case Type.DOUBLE, Type.LONG -> NullValue.SIZE2;
+          default -> NullValue.NONNULL;
+        };
+        case INVOKESPECIAL, INVOKEVIRTUAL, INVOKESTATIC, INVOKEINTERFACE -> switch (Type.getReturnType(((MethodInsnNode) node).desc).getSort()) {
+          case Type.OBJECT -> NullValue.NULLABLE;
+          case Type.DOUBLE, Type.LONG -> NullValue.SIZE2;
+          default -> NullValue.NONNULL;
+        };
+        case MULTIANEWARRAY -> NullValue.NONNULL;
+        default -> throw new AssertionError();
+      };
+    }
+
+    @Override
+    public void returnOperation(AbstractInsnNode node, NullValue v1, NullValue v2) {}
+
+    @Override
+    public NullValue merge(NullValue v1, NullValue v2) {
+      if (v1 == NullValue.SIZE2 && v2 == NullValue.SIZE2) {
+        return NullValue.SIZE2;
+      }
+      if (v1 == NullValue.NONNULL && v2 == NullValue.NONNULL) {
+        return NullValue.NONNULL;
+      }
+      return NullValue.NULLABLE;
+    }
+  }*/
 
   private static MethodVisitor initToFactoryAdapter(String internalName, String superName, Map<String, ClassData> classDataMap, int _this, MethodVisitor mv) {
     return new MethodVisitor(ASM9, mv) {

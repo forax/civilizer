@@ -30,6 +30,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+            <version>9.4</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.9.1</version>
@@ -65,7 +71,7 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
-                            <mainClass>com.github.forax.civilizer.Rewriter</mainClass>
+                            <mainClass>com.github.forax.civilizer.AllRewriter</mainClass>
                         </configuration>
                     </execution>
                 </executions>

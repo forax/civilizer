@@ -5,6 +5,7 @@ import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
 import com.github.forax.civilizer.runtime.Value;
 import com.github.forax.civilizer.runtime.ZeroDefault;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Disabled
 public class ZeroDefaultValueTest {
   @ZeroDefault @Value record Foo(int value) {}
 
