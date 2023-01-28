@@ -77,6 +77,7 @@ In the following code, we extract the argument of the class (in `$KP0`) (or use 
 if not defined) and extract the zeroth argument (in `$KP1`).
 In the constructor, the species `KP1` is used to specialize the array creation.
 ```java
+@Parametric
 class SimpleList<E> {
   private static final String $P0 = "species Ljava/lang/Object;";
   private static final String $P1 = "list.of P0;";
