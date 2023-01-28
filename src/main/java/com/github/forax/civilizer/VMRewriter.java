@@ -84,6 +84,10 @@ public class VMRewriter {
       "bsm_init_default",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
+  private static final Handle BSM_PUT_VALUE_CHECK = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_put_value_check",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      false);
   private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
@@ -302,6 +306,27 @@ public class VMRewriter {
           }
 
           @Override
+          public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+            var classData = classDataMap.get(owner);
+            if (opcode == PUTFIELD && classData != null && classData.parametric) {
+              var constant = classData.fieldRestrictionMap.get(new Field(name, descriptor));
+              if (constant != null) {
+                var condy = findCondy(constant);
+                var constantValue = constant.startsWith("P") ? condy : constant;
+                var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(descriptor), ClassDesc.ofDescriptor(descriptor));
+                if (!(constantValue instanceof ConstantDynamic)) {
+                  mv.visitVarInsn(ALOAD, 0);
+                  mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                  desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
+                }
+                mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_PUT_VALUE_CHECK, constant);
+                // fallthrough
+              }
+            }
+            super.visitFieldInsn(opcode, owner, name, descriptor);
+          }
+
+          @Override
           public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
             if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;") && ldcConstant != null) {
               // record constant
@@ -414,6 +439,11 @@ public class VMRewriter {
               return;  // skip DUP
             }
             super.visitInsn(opcode);
+          }
+
+          @Override
+          public void visitMaxs(int maxStack, int maxLocals) {
+            super.visitMaxs(maxStack + 1, maxLocals);
           }
 
           @Override
