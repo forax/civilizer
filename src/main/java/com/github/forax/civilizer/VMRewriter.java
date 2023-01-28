@@ -1,9 +1,6 @@
 package com.github.forax.civilizer;
 
-import com.github.forax.civilizer.Rewriter.ClassData;
-import com.github.forax.civilizer.Rewriter.TypeKind;
 import com.github.forax.civilizer.vm.RT;
-import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -18,16 +15,10 @@ import java.io.IOException;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
-import java.lang.invoke.ConstantBootstraps;
-import java.lang.invoke.MethodType;
-import java.lang.invoke.TypeDescriptor;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.AbstractList;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -74,6 +65,11 @@ public class VMRewriter {
     }
   }
 
+
+  private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_ldc",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      false);
   private static final Handle BSM_STATIC = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
       "bsm_static",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
@@ -98,9 +94,13 @@ public class VMRewriter {
       "bsm_raw_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_PRIMITIVE = new Handle(H_INVOKESTATIC, ConstantBootstraps.class.getName().replace('.', '/'),
-      "primitiveClass",
-      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Class;",
+  private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_type",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+      false);
+  private static final Handle BSM_QTYPE = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_qtype",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
 
   private static ClassData analyze(byte[] buffer) {
@@ -122,7 +122,8 @@ public class VMRewriter {
 
       private Object condyArgument(String arg) {
         return switch (arg.charAt(0)) {
-          case 'V', 'Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D' -> new ConstantDynamic(arg, "Ljava/lang/Class;", BSM_PRIMITIVE);
+          case 'V', 'Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D' -> new ConstantDynamic(arg, "Ljava/lang/Object;", BSM_TYPE);
+          case 'Q' -> new ConstantDynamic("_", "Ljava/lang/Object;", BSM_QTYPE, Type.getType("L" + arg.substring(1)));
           case 'L' -> Type.getType(arg);
           case 'K', 'P' -> {
             var condy = condyMap.get(arg.substring(0, arg.length() - 1));
@@ -213,7 +214,7 @@ public class VMRewriter {
           slot += type.getSize();
         }
         mv.visitLdcInsn(new ConstantDynamic("rawKiddyPool", "Ljava/lang/Object;", BSM_RAW_KIDDY_POOL));
-        mv.visitMethodInsn(INVOKESPECIAL, internalName, "<init>", newMethodDescriptor);
+        mv.visitMethodInsn(INVOKESPECIAL, internalName, "<init>", newMethodDescriptor, false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(slot + 1, slot);
         mv.visitEnd();
@@ -277,10 +278,25 @@ public class VMRewriter {
             if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;") && ldcConstant != null) {
               // record constant
               var constant = this.ldcConstant;
+              ldcConstant = null;
               var condy = findCondy(constant);
               constantValue = constant.startsWith("P") ? condy : constant;;
-              ldcConstant = null;
-              super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+              mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+              return;
+            }
+            if (owner.equals(RT.class.getName().replace('.', '/')) && name.equals("ldc") && descriptor.equals("()Ljava/lang/Object;")) {
+              var constant = constantValue;
+              if (constant == null) {
+                throw new IllegalStateException("no constant info for ldc");
+              }
+              constantValue = null;
+              if (constant instanceof ConstantDynamic condy) {
+                mv.visitLdcInsn(condy);
+              } else {
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                mv.visitInvokeDynamicInsn("ldc", "(Ljava/lang/Object;)Ljava/lang/Object;", BSM_LDC, constant);
+              }
               return;
             }
 

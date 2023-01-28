@@ -2,11 +2,14 @@ package com.github.forax.civilizer.vm;
 
 import java.lang.invoke.MethodType;
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.stream.Collectors.joining;
 
 public record Linkage(Species owner, Species returnType, List<Species> parameters) {
   public Linkage {
+    Objects.requireNonNull(owner);
+    Objects.requireNonNull(returnType);
     parameters = List.copyOf(parameters);
   }
 

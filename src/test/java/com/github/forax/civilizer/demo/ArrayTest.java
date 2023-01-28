@@ -3,7 +3,6 @@ package com.github.forax.civilizer.demo;
 import com.github.forax.civilizer.runtime.RT;
 import com.github.forax.civilizer.runtime.Value;
 import com.github.forax.civilizer.runtime.ZeroDefault;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
