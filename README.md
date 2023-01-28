@@ -148,7 +148,7 @@ mvn package
 
 It will compile, rewrite the bytecode of any packages containing `demo` and run the tests.
 
-## How to play with it it
+## How to play with it ?
 
 The simple way is to check the tests and add new ones :)
 
