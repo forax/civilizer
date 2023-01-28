@@ -132,8 +132,9 @@ for the VM, a reference to a `$KP` is a constant once JITed (the implementation 
 This should ensure proper performance, at the expense of the constant pool being quite bloated.
 
 Array specialization works, use site method specialization works, raw types are supported (using the argument of `classData`).
-Generic methods are not yet specialized and fields are not specialized (this requires an indirection).
-Inheritance of generic classes and interface default methods are not supported.
+Type restriction (with `@TypeRestriction`) on fields are implemented (but specialization of fields is not implemented).
+
+Generic methods are not yet specialized. Inheritance of generic classes and interface default methods are not supported.
 
 
 ## How to build it
@@ -147,8 +148,7 @@ mvn package
 
 It will compile, rewrite the bytecode of any packages containing `demo` and run the tests.
 
-## How to run it
-```bash
-  $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes com/github/forax/civilizer/demo/Demo
-  $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes:/Users/forax/.m2/repository/org/ow2/asm/asm/9.4/asm-9.4.jar com/github/forax/civilizer/species/Demo
-```
+## How to play with it it
+
+The simple way is to check the tests and add new ones :)
+
