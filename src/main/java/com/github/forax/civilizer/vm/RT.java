@@ -157,8 +157,13 @@ public class RT {
     }
   };
 
-  private static MethodHandle specialize(Linkage linkage, MethodHandle method, MethodType type) {
+  private static MethodHandle specializeInstanceMethod(Linkage linkage, MethodHandle method, MethodType type) {
     var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
+    return method.asType(specializedType).asType(type);
+  }
+
+  private static MethodHandle specializeStaticMethod(Linkage linkage, MethodHandle method, MethodType type) {
+    var specializedType = linkage.toMethodType();
     return method.asType(specializedType).asType(type);
   }
 
@@ -172,6 +177,7 @@ public class RT {
   }
 
   public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) {
+    // TODO
     throw new LinkageError(lookup + " " + name + " " + type+ " " + owner + " " + constant);
   }
 
@@ -180,7 +186,7 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findVirtual(type.parameterType(0), name, type.dropParameterTypes(0, 1));
-      var target = specialize(linkage, method, type);
+      var target = specializeInstanceMethod(linkage, method, type);
       return new ConstantCallSite(target);
     }
 
@@ -193,7 +199,8 @@ public class RT {
     if (constant instanceof Linkage linkage) {
       var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
-      var target = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
+      var method = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
+      var target = specializeStaticMethod(linkage, method, type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
