@@ -1,6 +1,9 @@
 package com.github.forax.civilizer.species;
 
+import com.github.forax.civilizer.vm.Parametric;
+
 public class Demo {
+  @Parametric
   static class Foo<T> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";

@@ -2,6 +2,7 @@ package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.demo.Complex;
 import com.github.forax.civilizer.vm.Linkage;
+import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
 import org.junit.jupiter.api.Test;
@@ -153,6 +154,7 @@ public class CondyLispTest {
 
   @Test
   public void ldcClassDataNoArgument() {
+    @Parametric
     class Foo<T> {
       private static final String $KP0 = "classData 42";
 
@@ -166,6 +168,7 @@ public class CondyLispTest {
     assertEquals(42, foo.value());
   }
 
+  @Parametric
   record Data<T>() {
     private static final String $KP0 = "classData 42";
 
@@ -196,6 +199,7 @@ public class CondyLispTest {
   }
 
 
+  @Parametric
   record Data2<T>() {
     private static final String $P0 = "list.of 42";
     private static final String $KP0 = "classData P0;";
@@ -227,6 +231,7 @@ public class CondyLispTest {
     Data2.test();
   }
 
+  @Parametric
   record Data3<T>() {
     private static final String $P0 = "list.of Ljava/lang/Object;";
     private static final String $KP0 = "classData P0;";

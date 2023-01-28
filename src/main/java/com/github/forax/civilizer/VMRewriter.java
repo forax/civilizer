@@ -1,6 +1,8 @@
 package com.github.forax.civilizer;
 
+import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -20,10 +22,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-
 
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
@@ -46,21 +46,12 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 
 public class VMRewriter {
-  record Signature(String desc) {
-    Signature {
-      Objects.requireIdentity(desc);
-    }
-  }
-  record ClassData(String internalName, Signature signature, HashMap<String, ConstantDynamic> condyMap, HashMap<String, Signature> methodData) {}
+  record ClassData(String internalName, boolean parametric, HashMap<String, ConstantDynamic> condyMap) {}
   record Analysis(HashMap<String,ClassData> classDataMap) {
     void dump() {
       for(var classData: classDataMap.values()) {
         System.out.println("class " + classData.internalName);
-        System.out.println("  signature: " + classData.signature);
-        for(var methodEntry: classData.methodData.entrySet()) {
-          System.out.println("    method: " + methodEntry.getKey());
-          System.out.println("      signature: " + methodEntry.getValue());
-        }
+        System.out.println("  parametric: " + classData.parametric);
       }
     }
   }
@@ -105,19 +96,23 @@ public class VMRewriter {
 
   private static ClassData analyze(byte[] buffer) {
     var condyMap = new HashMap<String, ConstantDynamic>();
-    var methodData = new HashMap<String, Signature>();
 
     var reader = new ClassReader(buffer);
     var cv = new ClassVisitor(ASM9) {
       private String internalName;
-      private Signature signature;
+      private boolean parametric;
 
       @Override
       public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
         internalName = name;
-        if (signature != null) {
-          this.signature = new Signature(signature);
+      }
+
+      @Override
+      public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        if (descriptor.equals("L" + Parametric.class.getName().replace('.', '/') + ";")) {
+          parametric = true;
         }
+        return null;
       }
 
       private Object condyArgument(String arg) {
@@ -151,19 +146,10 @@ public class VMRewriter {
         }
         return null;
       }
-
-      @Override
-      public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        //System.out.println("method signature " + signature);
-        if (signature != null) {
-          methodData.put(name + descriptor, new Signature(signature));
-        }
-        return null;
-      }
     };
     reader.accept(cv, 0);
 
-    return new ClassData(cv.internalName, cv.signature, condyMap, methodData);
+    return new ClassData(cv.internalName, cv.parametric, condyMap);
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
@@ -204,7 +190,7 @@ public class VMRewriter {
         return super.visitField(access, name, descriptor, signature, value);
       }
 
-      private void delegateInit(int access, String methodDescriptor, String newMethodDescriptor, String signature, String[] exceptions) {
+      private void delegateInit(int access, String methodDescriptor, String newMethodDescriptor) {
         var mv = super.visitMethod(access, "<init>", methodDescriptor, null, null);
         mv.visitCode();
         var slot = 1;
@@ -223,11 +209,11 @@ public class VMRewriter {
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
         MethodVisitor delegate;
-        if (classData.signature != null && methodName.equals("<init>")) { // need to initialize the kiddy pool
+        if (classData.parametric && methodName.equals("<init>")) { // need to initialize the kiddy pool
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
           desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
           var newMethodDescriptor = desc.descriptorString();
-          delegateInit(access, methodDescriptor, newMethodDescriptor, signature, exceptions);
+          delegateInit(access, methodDescriptor, newMethodDescriptor);
           var mv = super.visitMethod(access | ACC_SYNTHETIC, methodName, newMethodDescriptor, null, null);
           delegate = new MethodVisitor(ASM9, mv) {
             @Override
@@ -277,10 +263,10 @@ public class VMRewriter {
           public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
             if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;") && ldcConstant != null) {
               // record constant
-              var constant = this.ldcConstant;
+              var constant = ldcConstant;
               ldcConstant = null;
               var condy = findCondy(constant);
-              constantValue = constant.startsWith("P") ? condy : constant;;
+              constantValue = constant.startsWith("P") ? condy : constant;
               mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
               return;
             }
@@ -300,17 +286,11 @@ public class VMRewriter {
               return;
             }
 
-            var classSignature = Optional.ofNullable(classDataMap.get(owner))
-                .map(ClassData::signature)
-                .orElse(null);
-            var methodSignature = Optional.ofNullable(classDataMap.get(owner))
-                .flatMap(classData -> Optional.ofNullable(classData.methodData.get(name + descriptor)))
-                .orElse(null);
-            var specializeable = classSignature != null || methodSignature != null;
+            var parametric = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
 
             switch (opcode) {
               case INVOKESPECIAL -> {
-                if (specializeable && constantValue != null) {
+                if (parametric && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -325,7 +305,7 @@ public class VMRewriter {
                 }
               }
               case INVOKESTATIC -> {
-                if (specializeable && constantValue != null) {
+                if (parametric && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -339,7 +319,7 @@ public class VMRewriter {
                 }
               }
               case INVOKEVIRTUAL, INVOKEINTERFACE -> {
-                if (specializeable && constantValue != null) {
+                if (parametric && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -406,7 +386,7 @@ public class VMRewriter {
 
       @Override
       public void visitEnd() {
-        if (classData.signature != null) {  // parametric class
+        if (classData.parametric) {  // parametric class
           var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
           fv.visitEnd();
         }

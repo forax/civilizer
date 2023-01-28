@@ -1,6 +1,7 @@
 package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.demo.Complex;
+import com.github.forax.civilizer.vm.Parametric;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -10,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ValueSpecializedTest {
+  @Parametric
   static class SimpleList<E> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
