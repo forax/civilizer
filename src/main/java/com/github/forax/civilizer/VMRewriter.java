@@ -92,6 +92,10 @@ public class VMRewriter {
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_RAW = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_raw",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+      false);
   private static final Handle BSM_PRIMITIVE = new Handle(H_INVOKESTATIC, ConstantBootstraps.class.getName().replace('.', '/'),
       "primitiveClass",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Class;",
@@ -232,6 +236,14 @@ public class VMRewriter {
           private Object constantValue;
           private boolean removeDUP;
 
+          private ConstantDynamic findCondy(String ldcConstant) {
+            var condy =  classData.condyMap.get(ldcConstant);
+            if (condy == null) {
+              throw new IllegalStateException("unknown constant pool constant '" + ldcConstant + "'");
+            }
+            return condy;
+          }
+
           @Override
           public void visitLdcInsn(Object value) {
             if (value instanceof String s) {
@@ -245,10 +257,7 @@ public class VMRewriter {
             if (owner.equals("java/lang/String") && name.equals("intern") && descriptor.equals("()Ljava/lang/String;") && ldcConstant != null) {
               // record constant
               var constant = this.ldcConstant;
-              var condy =  classData.condyMap.get(constant);
-              if (condy == null) {
-                throw new IllegalStateException("unknown constant pool constant '" + constant + "'");
-              }
+              var condy = findCondy(constant);
               constantValue = constant.startsWith("P") ? condy : constant;;
               ldcConstant = null;
               super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
@@ -265,8 +274,11 @@ public class VMRewriter {
 
             switch (opcode) {
               case INVOKESPECIAL -> {
-                if (specializeable && constantValue != null) {
+                if (specializeable) {
                   var constant = constantValue;
+                  if (constant == null) {  // raw instantiation
+                    constant = new ConstantDynamic("RAW", "Ljava/lang/Object;", BSM_RAW);
+                  }
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));

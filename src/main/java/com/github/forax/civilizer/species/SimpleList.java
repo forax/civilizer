@@ -3,16 +3,17 @@ package com.github.forax.civilizer.species;
 import java.util.Objects;
 
 public class SimpleList<E> {
-  private static final String $KP0 = "classData";
-  private static final String $KP1 = "list.get KP0; 0";
-  private static final String $KP2 = "species KP1;";
+  private static final String $KP0 = "species Ljava/lang/Object;";
+  private static final String $KP1 = "list.of KP0;";
+  private static final String $KP2 = "classData KP1;";
+  private static final String $KP3 = "list.get KP2; 0";
 
   private E[] elements;
   private int size;
 
   SimpleList() {
     super();  // otherwise the annotation below will be attached to super()
-    "KP1".intern();
+    "KP3".intern();
     var elements = (E[]) new Object[16];
     this.elements = elements;
   }
@@ -50,5 +51,9 @@ public class SimpleList<E> {
     "P5".intern();
     var element = list.get(0);
     System.out.println(element);
+
+    var list2 = new SimpleList<String>();
+    list2.add("bar");
+    System.out.println(list2.get(0));
   }
 }

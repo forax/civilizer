@@ -18,6 +18,7 @@ import java.lang.invoke.MutableCallSite;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 import static java.lang.invoke.MethodType.methodType;
 import static org.objectweb.asm.Opcodes.*;
@@ -66,6 +67,7 @@ public class RT {
     return kiddyPoolLookup.lookupClass();
   }
 
+  // the cache should be concurrent and maintain a weak ref on the class
   private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
 
   private static Class<?> kiddyPoolClass(Lookup lookup, Species species) throws IllegalAccessException {
@@ -135,6 +137,18 @@ public class RT {
     }
   }
 
+  private static final Object RAW = new Object() {
+    @Override
+    public String toString() {
+      return "RAW";
+    }
+  };
+
+  private static MethodHandle specialize(Linkage linkage, MethodHandle method, MethodType type) {
+    var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
+    return method.asType(specializedType).asType(type);
+  }
+
   public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + owner + " " + constant);
   }
@@ -144,9 +158,7 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findVirtual(type.parameterType(0), name, type.dropParameterTypes(0, 1));
-      // specialize descriptor
-      var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
-      var target = method.asType(specializedType).asType(type);
+      var target = specialize(linkage, method, type);
       return new ConstantCallSite(target);
     }
 
@@ -154,8 +166,14 @@ public class RT {
   }
 
   public static CallSite bsm_new(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
-    System.out.println("bsm_new " + type + " " + constant);
+    System.out.println("bsm_new " + type + " " + constant + "(instance of " +constant.getClass() + ")");
 
+    if (constant == RAW) {
+      var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
+      var kiddyPoolClass = kiddyPoolClass(lookup, new Species(type.returnType(), RAW));
+      var target = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
+      return new ConstantCallSite(target);
+    }
     if (constant instanceof Linkage linkage) {
       var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
@@ -200,12 +218,20 @@ public class RT {
     System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
     return switch (action) {
-      case "classData" -> MethodHandles.classData(lookup, "_", Object.class);
+      case "classData" -> {
+        var classData = MethodHandles.classData(lookup, "_", Object.class);
+        yield classData == RAW ? args[0] : classData;
+      }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
       case "linkage" -> new Linkage(asSpecies(args[0]), asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
       default -> throw new LinkageError("unknown method " + Arrays.toString(args));
     };
+  }
+
+  public static Object bsm_raw(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
+    System.out.println("bsm_raw");
+    return RAW;
   }
 }
