@@ -81,11 +81,12 @@ public class RT {
   }
 
   private static class InliningCache extends MutableCallSite {
-    private static final MethodHandle SLOW_PATH;
+    private static final MethodHandle SLOW_PATH, POINTER_CHECK;
     static {
       var lookup = MethodHandles.lookup();
       try {
         SLOW_PATH = lookup.findVirtual(InliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
+        POINTER_CHECK = lookup.findStatic(InliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new AssertionError(e);
       }
@@ -104,12 +105,21 @@ public class RT {
       setTarget(MethodHandles.foldArguments(MethodHandles.exactInvoker(type), combiner));
     }
 
+    private static boolean pointerCheck(Object o, Object o2) {
+      return o == o2;
+    }
+
     private MethodHandle slowPath(Object kiddyPool) throws Throwable {
       var accessor = lookup.findStatic((Class<?>) kiddyPool, "$" + kiddyPoolRef, methodType(Object.class));
       var value = accessor.invokeExact();
 
       var target = ((CallSite) bsm.invoke(value)).dynamicInvoker();
       target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
+
+      var test = MethodHandles.dropArguments(POINTER_CHECK.bindTo(kiddyPool),0, type().parameterList().subList(0, type().parameterCount() - 1));
+      var guard = MethodHandles.guardWithTest(test, target, new InliningCache(type(), lookup, bsm, kiddyPoolRef).dynamicInvoker());
+      setTarget(guard);
+
       return target;
     }
   }
