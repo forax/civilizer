@@ -125,7 +125,7 @@ the species `Complex` as parameter (`$P4`) and the method `get` with a linkage t
 
 This prototype generate a constant dynamic per `$P`, a kiddy constant pool per specialization that contains
 all the `$KP`. 
-All the specialized operations are re-written as a call invokedynamic with the correspondant constant pool constant
+All the specialized operations are re-written as an invokedynamic call with the correspondant constant pool constant
 as parameter.
 The values of the type arguments inside the constant pools are computed once when asks. a reference to a `$P` is a constant
 for the VM, a reference to a `$KP` is a constant once JITed (the implementation uses an inlining cache per operation on `$KP`).
