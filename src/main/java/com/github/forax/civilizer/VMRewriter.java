@@ -45,12 +45,14 @@ import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.DUP;
 import static org.objectweb.asm.Opcodes.GETFIELD;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.INVOKEINTERFACE;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
+import static org.objectweb.asm.Opcodes.RETURN;
 
 public class VMRewriter {
   record Signature(String desc) {
@@ -92,8 +94,8 @@ public class VMRewriter {
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_RAW = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
-      "bsm_raw",
+  private static final Handle BSM_RAW_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+      "bsm_raw_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
   private static final Handle BSM_PRIMITIVE = new Handle(H_INVOKESTATIC, ConstantBootstraps.class.getName().replace('.', '/'),
@@ -201,13 +203,31 @@ public class VMRewriter {
         return super.visitField(access, name, descriptor, signature, value);
       }
 
+      private void delegateInit(int access, String methodDescriptor, String newMethodDescriptor, String signature, String[] exceptions) {
+        var mv = super.visitMethod(access, "<init>", methodDescriptor, null, null);
+        mv.visitCode();
+        var slot = 1;
+        mv.visitVarInsn(ALOAD, 0);
+        for(var type: Type.getArgumentTypes(methodDescriptor)) {
+          mv.visitVarInsn(type.getOpcode(ILOAD), slot);
+          slot += type.getSize();
+        }
+        mv.visitLdcInsn(new ConstantDynamic("rawKiddyPool", "Ljava/lang/Object;", BSM_RAW_KIDDY_POOL));
+        mv.visitMethodInsn(INVOKESPECIAL, internalName, "<init>", newMethodDescriptor);
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(slot + 1, slot);
+        mv.visitEnd();
+      }
+
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
         MethodVisitor delegate;
         if (classData.signature != null && methodName.equals("<init>")) { // need to initialize the kiddy pool
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
           desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
-          var mv = super.visitMethod(access, methodName, desc.descriptorString(), signature, exceptions);
+          var newMethodDescriptor = desc.descriptorString();
+          delegateInit(access, methodDescriptor, newMethodDescriptor, signature, exceptions);
+          var mv = super.visitMethod(access | ACC_SYNTHETIC, methodName, newMethodDescriptor, null, null);
           delegate = new MethodVisitor(ASM9, mv) {
             @Override
             public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
@@ -274,11 +294,8 @@ public class VMRewriter {
 
             switch (opcode) {
               case INVOKESPECIAL -> {
-                if (specializeable) {
+                if (specializeable && constantValue != null) {
                   var constant = constantValue;
-                  if (constant == null) {  // raw instantiation
-                    constant = new ConstantDynamic("RAW", "Ljava/lang/Object;", BSM_RAW);
-                  }
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));
@@ -329,8 +346,10 @@ public class VMRewriter {
           public void visitTypeInsn(int opcode, String type) {
             switch (opcode) {
               case NEW -> {
-                removeDUP = true;
-                return;  // skip NEW
+                if (constantValue != null) {  // remove NEW DUP
+                  removeDUP = true;
+                  return;  // skip NEW
+                }
               }
               case ANEWARRAY -> {
                 if (constantValue != null) {

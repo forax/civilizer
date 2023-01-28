@@ -168,12 +168,6 @@ public class RT {
   public static CallSite bsm_new(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
     System.out.println("bsm_new " + type + " " + constant + "(instance of " +constant.getClass() + ")");
 
-    if (constant == RAW) {
-      var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
-      var kiddyPoolClass = kiddyPoolClass(lookup, new Species(type.returnType(), RAW));
-      var target = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
-      return new ConstantCallSite(target);
-    }
     if (constant instanceof Linkage linkage) {
       var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
@@ -230,8 +224,8 @@ public class RT {
     };
   }
 
-  public static Object bsm_raw(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
-    System.out.println("bsm_raw");
-    return RAW;
+  public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
+    System.out.println("bsm_raw_kiddy_pool");
+    return kiddyPoolClass(lookup, new Species(lookup.lookupClass(), RAW));
   }
 }
