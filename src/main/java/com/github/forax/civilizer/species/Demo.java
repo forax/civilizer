@@ -29,6 +29,7 @@ public class Demo {
   private static final String $P6 = "linkage P4; P2;";
   private static final String $P7 = "linkage P4; P4;";
 
+  // $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes:/Users/forax/.m2/repository/org/ow2/asm/asm/9.4/asm-9.4.jar com/github/forax/civilizer/species/Demo
   public static void main(String[] args) {
     "P5".intern();
     var foo = new Foo<String>("foo");
