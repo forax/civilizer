@@ -16,6 +16,7 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodHandles.Lookup.ClassOption;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -138,13 +139,14 @@ public class RT {
     }
   }
 
-  private static final MethodHandle BSM_LDC, BSM_NEW, BSM_NEW_ARRAY;
+  private static final MethodHandle BSM_LDC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT;
   static {
     var lookup = MethodHandles.lookup();
     try {
       BSM_LDC = lookup.findStatic(RT.class, "bsm_ldc", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_NEW = lookup.findStatic(RT.class, "bsm_new", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
+      BSM_INIT_DEFAULT = lookup.findStatic(RT.class, "bsm_init_default", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
@@ -211,7 +213,7 @@ public class RT {
     throw new LinkageError(lookup + " " + name + " " + type + " " + constant);
   }
 
-  public static CallSite bsm_new_array(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
+  public static CallSite bsm_new_array(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_new_array " + type + " " + constant);
 
     if (constant instanceof Species species) {
@@ -222,6 +224,21 @@ public class RT {
     if (constant instanceof String kiddyPoolRef) {
       var bsmNewArray = MethodHandles.insertArguments(BSM_NEW_ARRAY, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
       return new InliningCache(type, lookup, bsmNewArray, kiddyPoolRef);
+    }
+
+    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+  }
+
+  public static CallSite bsm_init_default(Lookup lookup, String name, MethodType type, Object constant) {
+    System.out.println("bsm_init_default " + type + " " + constant);
+
+    if (constant instanceof Species species) {
+      var defaultValue = Array.get(Array.newInstance(species.raw(), 1), 0);
+      return new ConstantCallSite(MethodHandles.constant(type.returnType(), defaultValue));
+    }
+    if (constant instanceof String kiddyPoolRef) {
+      var bsmInitDefault = MethodHandles.insertArguments(BSM_INIT_DEFAULT, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
+      return new InliningCache(type, lookup, bsmInitDefault, kiddyPoolRef);
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);

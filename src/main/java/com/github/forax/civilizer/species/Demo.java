@@ -1,6 +1,7 @@
 package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.vm.Parametric;
+import com.github.forax.civilizer.vm.TypeRestriction;
 
 public class Demo {
   @Parametric
@@ -13,6 +14,7 @@ public class Demo {
     private static final String $KP3 = "species Lcom/github/forax/civilizer/species/Demo$Foo; KP2;";
     private static final String $KP4 = "linkage KP3; KP3; KP1;";
 
+    @TypeRestriction("KP1")
     private T t;
 
     Foo(T t) { this.t = t; }
