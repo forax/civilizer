@@ -44,6 +44,7 @@ import static org.objectweb.asm.Opcodes.INVOKEINTERFACE;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
+import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
@@ -243,18 +244,26 @@ public class VMRewriter {
         return super.visitField(access, name, descriptor, signature, value);
       }
 
-      private void delegateInit(int access, String methodDescriptor, String newMethodDescriptor) {
-        var mv = super.visitMethod(access, "<init>", methodDescriptor, null, null);
+      private void delegateMethod(int access, String name, String methodDescriptor, String newMethodDescriptor) {
+        var mv = super.visitMethod(access, name, methodDescriptor, null, null);
         mv.visitCode();
-        var slot = 1;
-        mv.visitVarInsn(ALOAD, 0);
+        int slot;
+        int opcode;
+        if ((access & ACC_STATIC) != 0) {
+          slot = 0;
+          opcode = INVOKESTATIC;
+        } else {
+          slot = 1;
+          opcode = INVOKESPECIAL;  //TODO deals with instance method other than <init> here
+          mv.visitVarInsn(ALOAD, 0);
+        }
         for(var type: Type.getArgumentTypes(methodDescriptor)) {
           mv.visitVarInsn(type.getOpcode(ILOAD), slot);
           slot += type.getSize();
         }
         mv.visitLdcInsn(new ConstantDynamic("rawKiddyPool", "Ljava/lang/Object;", BSM_RAW_KIDDY_POOL));
-        mv.visitMethodInsn(INVOKESPECIAL, internalName, "<init>", newMethodDescriptor, false);
-        mv.visitInsn(RETURN);
+        mv.visitMethodInsn(opcode, internalName, name, newMethodDescriptor, false);
+        mv.visitInsn(Type.getReturnType(newMethodDescriptor).getOpcode(IRETURN));
         mv.visitMaxs(slot + 1, slot);
         mv.visitEnd();
       }
@@ -275,7 +284,7 @@ public class VMRewriter {
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
           desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
           var newMethodDescriptor = desc.descriptorString();
-          delegateInit(access, methodDescriptor, newMethodDescriptor);
+          delegateMethod(access, "<init>", methodDescriptor, newMethodDescriptor);
           var mv = super.visitMethod(access | ACC_SYNTHETIC, methodName, newMethodDescriptor, null, null);
           delegate = new MethodVisitor(ASM9, mv) {
             @Override
@@ -316,7 +325,9 @@ public class VMRewriter {
           if (parametricMethod) {
             var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
             desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
-            delegate = super.visitMethod(access, methodName, desc.descriptorString(), signature, exceptions);
+            var newMethodDescriptor = desc.descriptorString();
+            delegateMethod(access, methodName, methodDescriptor, newMethodDescriptor);
+            delegate = super.visitMethod(access| ACC_SYNTHETIC, methodName, newMethodDescriptor, signature, exceptions);
           } else {
             delegate = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
           }
@@ -324,9 +335,6 @@ public class VMRewriter {
 
         var isStatic = (access & ACC_STATIC) != 0;
         var kiddyPoolSlot = (isStatic? -1 : 0) + (Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2);  // if the method is parametric
-
-        System.out.println(internalName + "." + methodName + methodDescriptor);
-        System.out.println("isStatic " + isStatic + " kiddyPoolSlot " + kiddyPoolSlot);
 
         return new MethodVisitor(ASM9, delegate) {
           private String ldcConstant;

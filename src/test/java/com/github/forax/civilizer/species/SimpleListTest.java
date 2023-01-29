@@ -16,12 +16,14 @@ public class SimpleListTest {
     private static final String $P1 = "list.of P0;";
     private static final String $KP0 = "classData P1;";
     private static final String $KP1 = "list.get KP0; 0";
+    private static final String $KP2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP0;";
+    private static final String $KP3 = "linkage KP2; KP2;";
 
     private E[] elements;
     private int size;
 
     SimpleList() {
-      super(); // otherwise the annotation below will be attached to super()
+      super(); // otherwise the constant below will be attached to super()
       "KP1".intern();
       @SuppressWarnings("unchecked")
       var elements = (E[]) new Object[16];
@@ -42,6 +44,12 @@ public class SimpleListTest {
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];
+    }
+
+    @Parametric
+    public static <T> SimpleList<T> of() {
+      "KP3".intern();
+      return new SimpleList<>();
     }
   }
 
@@ -141,5 +149,29 @@ public class SimpleListTest {
     var element = list.get(0);
 
     assertEquals(744, element);
+  }
+
+
+  @Test
+  public void specializeMethodOfStringList() {
+    "P_string_3".intern();
+    var list = SimpleList.<String>of();
+
+    "P_string_4".intern();
+    list.add("bar");
+
+    "P_string_5".intern();
+    var element = list.get(0);
+
+    assertEquals("bar", element);
+  }
+
+  @Test
+  public void rawMethodOf() {
+    var list = SimpleList.<String>of();
+    list.add("baz");
+    var element = list.get(0);
+
+    assertEquals("baz", element);
   }
 }
