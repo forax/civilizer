@@ -190,7 +190,7 @@ public class RT {
   }
 
   public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) throws NoSuchMethodException, IllegalAccessException {
-    System.out.println("bsm_static " + name + type + " " + constant);
+    //System.out.println("bsm_static " + name + type + " " + constant);
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
@@ -255,7 +255,7 @@ public class RT {
   }
 
   public static CallSite bsm_init_default(Lookup lookup, String name, MethodType type, Object constant) {
-    System.out.println("bsm_init_default " + type + " " + constant);
+    //System.out.println("bsm_init_default " + type + " " + constant);
 
     if (constant instanceof Species species) {
       var defaultValue = Array.get(Array.newInstance(species.raw(), 1), 0);
@@ -270,7 +270,7 @@ public class RT {
   }
 
   public static CallSite bsm_put_value_check(Lookup lookup, String name, MethodType type, Object constant) {
-    System.out.println("bsm_put_value_check " + type + " " + constant);
+    //System.out.println("bsm_put_value_check " + type + " " + constant);
 
     if (constant instanceof Species species) {
       var identity = MethodHandles.identity(type.parameterType(0));
@@ -316,7 +316,6 @@ public class RT {
       }
       case "methodData" -> {
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        System.out.println("method data classDataPair " + classDataPair);
         yield classDataPair.methodParameters == null ? args[0] : classDataPair.methodParameters;
       }
       case "list.of" -> List.of(args);
