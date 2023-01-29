@@ -66,47 +66,48 @@ public class VMRewriter {
   }
 
 
-  private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static String RT_INTERNAL = RT.class.getName().replace('.', '/');
+  private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_ldc",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_STATIC = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_STATIC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_static",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_VIRTUAL = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_VIRTUAL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_virtual",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_NEW = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_NEW = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_new",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_NEW_ARRAY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_NEW_ARRAY = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_new_array",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_INIT_DEFAULT = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_INIT_DEFAULT = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_init_default",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_PUT_VALUE_CHECK = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_PUT_VALUE_CHECK = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_put_value_check",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_RAW_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_RAW_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_raw_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_type",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_QTYPE = new Handle(H_INVOKESTATIC, RT.class.getName().replace('.', '/'),
+  private static final Handle BSM_QTYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_qtype",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
@@ -363,7 +364,7 @@ public class VMRewriter {
               mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
               return;
             }
-            if (owner.equals(RT.class.getName().replace('.', '/')) && name.equals("ldc") && descriptor.equals("()Ljava/lang/Object;")) {
+            if (owner.equals(RT_INTERNAL) && name.equals("ldc") && descriptor.equals("()Ljava/lang/Object;")) {
               var constant = constantValue;
               if (constant == null) {
                 throw new IllegalStateException("no constant info for ldc");
@@ -464,7 +465,7 @@ public class VMRewriter {
 
           @Override
           public void visitMaxs(int maxStack, int maxLocals) {
-            super.visitMaxs(maxStack + 1, maxLocals + 1);
+            super.visitMaxs(maxStack + 1, maxLocals);
           }
 
           @Override
