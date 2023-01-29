@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -49,7 +50,12 @@ import static org.objectweb.asm.Opcodes.RETURN;
 
 public class VMRewriter {
   record Field(String name, String descriptor) {}
-  record ClassData(String internalName, boolean parametric, HashMap<String, ConstantDynamic> condyMap, LinkedHashMap<Field,String> fieldRestrictionMap) {}
+  record Method(String name, String descriptor) {}
+  record ClassData(String internalName,
+                   boolean parametric,
+                   HashMap<String, ConstantDynamic> condyMap,
+                   LinkedHashMap<Field,String> fieldRestrictionMap,
+                   HashSet<Method> methodParametricSet) {}
   record Analysis(HashMap<String,ClassData> classDataMap) {
     void dump() {
       for(var classData: classDataMap.values()) {
@@ -108,9 +114,13 @@ public class VMRewriter {
   private static ClassData analyze(byte[] buffer) {
     var condyMap = new HashMap<String, ConstantDynamic>();
     var fieldRestrictionMap = new LinkedHashMap<Field,String>();
+    var methodParametricSet = new HashSet<Method>();
 
     var reader = new ClassReader(buffer);
     var cv = new ClassVisitor(ASM9) {
+      private static final String PARAMETRIC_DESCRIPTOR = "L" + Parametric.class.getName().replace('.', '/') + ";";
+      private static final String TYPE_RESTRICTION_DESCRIPTOR = "L" + TypeRestriction.class.getName().replace('.', '/') + ";";
+
       private String internalName;
       private boolean parametric;
 
@@ -121,7 +131,7 @@ public class VMRewriter {
 
       @Override
       public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-        if (descriptor.equals("L" + Parametric.class.getName().replace('.', '/') + ";")) {
+        if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
           parametric = true;
         }
         return null;
@@ -160,7 +170,7 @@ public class VMRewriter {
         return new FieldVisitor(ASM9) {
           @Override
           public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (descriptor.equals("L" + TypeRestriction.class.getName().replace('.', '/') + ";")) {
+            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
               return new AnnotationVisitor(ASM9) {
                 @Override
                 public void visit(String name, Object value) {
@@ -172,14 +182,26 @@ public class VMRewriter {
               };
             }
             return null;
+          }
+        };
+      }
 
+      @Override
+      public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        return new MethodVisitor(ASM9) {
+          @Override
+          public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
+              methodParametricSet.add(new Method(methodName, methodDescriptor));
+            }
+            return null;
           }
         };
       }
     };
     reader.accept(cv, 0);
 
-    return new ClassData(cv.internalName, cv.parametric, condyMap, fieldRestrictionMap);
+    return new ClassData(cv.internalName, cv.parametric, condyMap, fieldRestrictionMap, methodParametricSet);
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
@@ -297,6 +319,11 @@ public class VMRewriter {
           private Object constantValue;
           private boolean removeDUP;
 
+          private void loadKiddyPool() {
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+          }
+
           @Override
           public void visitLdcInsn(Object value) {
             if (value instanceof String s) {
@@ -315,8 +342,7 @@ public class VMRewriter {
                 var constantValue = constant.startsWith("P") ? condy : constant;
                 var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(descriptor), ClassDesc.ofDescriptor(descriptor));
                 if (!(constantValue instanceof ConstantDynamic)) {
-                  mv.visitVarInsn(ALOAD, 0);
-                  mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                  loadKiddyPool();
                   desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
                 }
                 mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_PUT_VALUE_CHECK, constant);
@@ -346,8 +372,7 @@ public class VMRewriter {
               if (constant instanceof ConstantDynamic condy) {
                 mv.visitLdcInsn(condy);
               } else {
-                mv.visitVarInsn(ALOAD, 0);
-                mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                loadKiddyPool();
                 mv.visitInvokeDynamicInsn("ldc", "(Ljava/lang/Object;)Ljava/lang/Object;", BSM_LDC, constant);
               }
               return;
@@ -363,8 +388,7 @@ public class VMRewriter {
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));
                   if (!(constant instanceof ConstantDynamic)) {
-                    mv.visitVarInsn(ALOAD, 0);
-                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    loadKiddyPool();
                     desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("new", desc.descriptorString(), BSM_NEW, constant);
@@ -377,8 +401,7 @@ public class VMRewriter {
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   if (!(constant instanceof ConstantDynamic)) {
-                    mv.visitVarInsn(ALOAD, 0);
-                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    loadKiddyPool();
                     desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
                   }
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_STATIC, Type.getObjectType(owner), constant);
@@ -392,8 +415,7 @@ public class VMRewriter {
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   desc = desc.insertParameterTypes(0, ClassDesc.ofInternalName(owner));
                   if (!(constant instanceof ConstantDynamic)) {
-                    mv.visitVarInsn(ALOAD, 0);
-                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    loadKiddyPool();
                     desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
                   }
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_VIRTUAL, constant);
@@ -420,8 +442,7 @@ public class VMRewriter {
                   constantValue = null;
                   var desc = MethodTypeDesc.of(ClassDesc.ofInternalName(type).arrayType(), ConstantDescs.CD_int);
                   if (!(constant instanceof ConstantDynamic)) {
-                    mv.visitVarInsn(ALOAD, 0);
-                    mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+                    loadKiddyPool();
                     desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("newArray", desc.descriptorString(), BSM_NEW_ARRAY, constant);
@@ -443,7 +464,7 @@ public class VMRewriter {
 
           @Override
           public void visitMaxs(int maxStack, int maxLocals) {
-            super.visitMaxs(maxStack + 1, maxLocals);
+            super.visitMaxs(maxStack + 1, maxLocals + 1);
           }
 
           @Override
