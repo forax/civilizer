@@ -1,8 +1,8 @@
 # civilizer
 A prototype that transforms primitive types to civilized types by rewriting the bytecode.
 
-This repository contains two rewriters, one that transforms classical Java object into value class (`Rewriter`)
-and another that (`VMRewriter`) that rewrite generics to support specialization (so a list of values is fully specialized).
+This repository contains two rewriters, one (`Rewriter`) transforms classical Java object into value class 
+and another (`VMRewriter`) transforms generics to support specialization (so a list of values is fully specialized).
 
 ## Rewriter
 
@@ -20,7 +20,7 @@ The prototype defines 4 annotations,
 
 On stack, value types are scalarized, on heap, non-null zero-default value type are flattened, i.e. stored without a pointer.
 
-By example, the field age declared below is stored as an int on heap because the value type `Age` is declared as @ZeroDefault and
+For example, the field age declared below is stored as an int on heap because the value type `Age` is declared as @ZeroDefault and
 the field `age` is declared @NonNull. 
 ```java
   class AgeContainer {
@@ -56,7 +56,8 @@ Each constant can be initialized with a kind of LISP that recognize the actions
 - `species` <class> <parameter>? to create a species,
 - `list.of` <args>... to create a list,
 - `list.get` <list> <index> to extract the nth item of a list,
-- `classData` <arg> that extract the argument of the class or uses <arg> if no argument is specified. 
+- `classData` <arg> that extract the argument of the parametric class or uses <arg> if no argument is specified. 
+- `methodData` <arg> that extract the argument of the parametric method or uses <arg> if no argument is specified.
 
 The arguments of the generics are available at runtime using to forms
 - [Species](src/main/java/com/github/forax/civilizer/vm/Species.java) that specify a generics
@@ -64,7 +65,7 @@ The arguments of the generics are available at runtime using to forms
   The opcode `anewarray` uses a Species.
 - [Linkage](src/main/java/com/github/forax/civilizer/vm/Linkage.java) that specifies the Species of the owner,
   the species of the return type and the species of the parameter of a method call.
-  The opcodes `new`, `invokespecial`, `invokevirtual` and `invokeinterface` (`invokestatic` TBD).
+  The opcodes `new`, `invokespecial`, `invokevirtual`, `invokeinterface` and `invokestatic`.
 
 To specify a species or a linkage of an operation, the rewriter recognize the pattern
 ```java
@@ -73,7 +74,8 @@ To specify a species or a linkage of an operation, the rewriter recognize the pa
 ```
 with ref a reference to a $P or a $KP constants and the operation one of the operation above.
 
-In the following code, we extract the argument of the class (in `$KP0`) (or use the species java/lang/Object 
+In the following code, we first declare the class `SimpleList` as parametric using the annotation `@Parametric`.
+We then extract the argument of the class (in `$KP0`) (or use the species java/lang/Object 
 if not defined) and extract the zeroth argument (in `$KP1`).
 In the constructor, the species `KP1` is used to specialize the array creation.
 ```java
@@ -131,10 +133,11 @@ The values of the type arguments inside the constant pools are computed once whe
 for the VM, a reference to a `$KP` is a constant once JITed (the implementation uses an inlining cache per operation on `$KP`).
 This should ensure proper performance, at the expense of the constant pool being quite bloated.
 
-Array specialization works, use site method specialization works, raw types are supported (using the argument of `classData`).
-Type restriction (with `@TypeRestriction`) on fields are implemented (but specialization of fields is not implemented).
+Parametric class instantiation works, parametric method instantiation work, array specialization works,
+use site method specialization works, raw types are supported (using the argument of `classData`/`methodData`).
+Type restriction (with `@TypeRestriction`) on fields are implemented (specialization of fields is not implemented).
 
-Generic methods are not yet specialized. Inheritance of generic classes and interface default methods are not supported.
+Inheritance of generic classes and interface default methods are not supported.
 
 
 ## How to build it
