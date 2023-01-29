@@ -80,8 +80,12 @@ public class RT {
     return kiddyPoolLookup.lookupClass();
   }
 
-  // the cache should be concurrent and maintain a weak ref on the class
+  private record ClassDataPair(Object speciesParameters, Object methodParameters) {}
+  private record MethodSpecies(Species species, Object parameters, String name, String descriptor) {}
+
+  // caches should be concurrent and maintain a weak ref on the class
   private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
+  private static final HashMap<MethodSpecies, Class<?>> KIDDY_POOL_METH_CACHE = new HashMap<>();
 
   private static Class<?> kiddyPoolClass(Lookup lookup, Species species) throws IllegalAccessException {
     return KIDDY_POOL_CACHE.computeIfAbsent(species, sp -> {
@@ -91,7 +95,19 @@ public class RT {
       } catch (IllegalAccessException e) {
         throw (IllegalAccessError) new IllegalAccessError().initCause(e);
       }
-      return createKiddyPoolClass(speciesLookup, sp.raw(), sp.parameters());
+      return createKiddyPoolClass(speciesLookup, sp.raw(), new ClassDataPair(sp.parameters(), null));
+    });
+  }
+
+  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies) throws IllegalAccessException {
+    return KIDDY_POOL_METH_CACHE.computeIfAbsent(methodSpecies, msp -> {
+      Lookup speciesLookup;
+      try {
+        speciesLookup = MethodHandles.privateLookupIn(msp.species.raw(), lookup);
+      } catch (IllegalAccessException e) {
+        throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+      }
+      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new ClassDataPair(msp.species.parameters(), msp.parameters));
     });
   }
 
@@ -139,11 +155,12 @@ public class RT {
     }
   }
 
-  private static final MethodHandle BSM_LDC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE_CHECK;
+  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE_CHECK;
   static {
     var lookup = MethodHandles.lookup();
     try {
       BSM_LDC = lookup.findStatic(RT.class, "bsm_ldc", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
+      BSM_STATIC = lookup.findStatic(RT.class, "bsm_static", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Class.class, Object.class));
       BSM_NEW = lookup.findStatic(RT.class, "bsm_new", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_INIT_DEFAULT = lookup.findStatic(RT.class, "bsm_init_default", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
@@ -152,13 +169,6 @@ public class RT {
       throw new AssertionError(e);
     }
   }
-
-  private static final Object RAW = new Object() {
-    @Override
-    public String toString() {
-      return "RAW";
-    }
-  };
 
   private static MethodHandle specializeInstanceMethod(Linkage linkage, MethodHandle method, MethodType type) {
     var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
@@ -179,8 +189,22 @@ public class RT {
     return new ConstantCallSite(MethodHandles.constant(Object.class, constant));
   }
 
-  public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) {
-    // TODO
+  public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) throws NoSuchMethodException, IllegalAccessException {
+    System.out.println("bsm_static " + name + type + " " + constant);
+
+    if (constant instanceof Linkage linkage) {
+      var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
+      var methodSpecies = new MethodSpecies(linkage.owner(), linkage.parameters(), name, type.toMethodDescriptorString());
+      var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies);
+      var mh = MethodHandles.insertArguments(method, type.parameterCount(), kiddyPoolClass);
+      var target = specializeStaticMethod(linkage, mh, type);
+      return new ConstantCallSite(target);
+    }
+    if (constant instanceof String kiddyPoolRef) {
+      var bsmNew = MethodHandles.insertArguments(BSM_STATIC, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
+      return new InliningCache(type, lookup, bsmNew, kiddyPoolRef);
+    }
+
     throw new LinkageError(lookup + " " + name + " " + type+ " " + owner + " " + constant);
   }
 
@@ -287,8 +311,13 @@ public class RT {
 
     return switch (action) {
       case "classData" -> {
-        var classData = MethodHandles.classData(lookup, "_", Object.class);
-        yield classData == RAW ? args[0] : classData;
+        var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
+        yield classDataPair.speciesParameters == null ? args[0] : classDataPair.speciesParameters;
+      }
+      case "methodData" -> {
+        var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
+        System.out.println("method data classDataPair " + classDataPair);
+        yield classDataPair.methodParameters == null ? args[0] : classDataPair.methodParameters;
       }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
@@ -301,6 +330,6 @@ public class RT {
 
   public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
     //System.out.println("bsm_raw_kiddy_pool");
-    return kiddyPoolClass(lookup, new Species(lookup.lookupClass(), RAW));
+    return kiddyPoolClass(lookup, new Species(lookup.lookupClass(), null));
   }
 }

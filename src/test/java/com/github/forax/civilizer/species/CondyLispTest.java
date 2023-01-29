@@ -7,10 +7,12 @@ import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Array;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 public class CondyLispTest {
@@ -282,5 +284,32 @@ public class CondyLispTest {
   @Test
   public void kiddyPoolConstantsAreConstant() {
     Data3.test();
+  }
+
+
+  @Parametric
+  class MethodData {
+    private static final String $KP0 = "methodData 55";
+
+    @Parametric
+    static Object value() {
+      "KP0".intern();
+      return RT.ldc();
+    }
+
+    private static final String $P0 = "species Lcom/github/forax/civilizer/species/CondyLispTest$MethodData;";
+    private static final String $P1 = "linkaze P0; 42 Ljava/lang/Object;";
+
+    static void test() {
+      "P1".intern();
+      var value = MethodData.value();
+
+      assertEquals(42, value);
+    }
+  }
+
+  @Test
+  public void ldcMethodData() {
+    MethodData.test();
   }
 }

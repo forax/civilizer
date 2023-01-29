@@ -1,13 +1,17 @@
 package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.demo.Complex;
+import com.github.forax.civilizer.species.CondyLispTest.MethodData;
 import com.github.forax.civilizer.vm.Parametric;
+import com.github.forax.civilizer.vm.RT;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ValueSpecializedTest {
@@ -84,5 +88,53 @@ public class ValueSpecializedTest {
     var list = new SimpleList<Complex>();
 
     assertThrows(NullPointerException.class, () -> list.add(null));
+  }
+
+
+  @Parametric
+  record MethodData() {
+    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $KP0 = "methodData P0;";
+    private static final String $KP1 = "list.get KP0; 0";
+
+    @Parametric
+    @SuppressWarnings("unchecked")
+    static <T> T defaultValue() {
+      "KP1".intern();
+      var argument = (Class<?>) RT.ldc();
+      return (T) Array.get(Array.newInstance(argument, 1), 0);
+    }
+  }
+
+  @Test
+  public void specializedStringDefaultValue() {
+    class TestWithString {
+      private static final String $P0 = "list.of Ljava/lang/String;";
+      private static final String $P1 = "linkaze Lcom/github/forax/civilizer/species/ValueSpecializedTest$MethodData; P0; Ljava/lang/Object;";
+
+      static void test() {
+        "P1".intern();
+        var value = MethodData.defaultValue();
+
+        assertNull(value);
+      }
+    }
+    TestWithString.test();
+  }
+
+  @Test
+  public void specializedComplexDefaultValue() {
+    class TestWithComplex {
+      private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P1 = "linkaze Lcom/github/forax/civilizer/species/ValueSpecializedTest$MethodData; P0; Ljava/lang/Object;";
+
+      static void test() {
+        "P1".intern();
+        var value = MethodData.defaultValue();
+
+        assertEquals(Complex.of(0.0, 0.0), value);
+      }
+    }
+    TestWithComplex.test();
   }
 }

@@ -283,7 +283,7 @@ public class VMRewriter {
               if (opcode == INVOKESPECIAL && owner.equals(supername) && name.equals("<init>")) {
                 super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                 mv.visitVarInsn(ALOAD, 0);
-                var kiddyPoolSlot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // class is parametric
+                var kiddyPoolSlot = Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // class is parametric
                 mv.visitVarInsn(ALOAD, kiddyPoolSlot);
                 mv.visitFieldInsn(PUTFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
 
@@ -322,7 +322,12 @@ public class VMRewriter {
           }
         }
 
-        var kiddyPoolSlot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // if the method is parametric
+        var isStatic = (access & ACC_STATIC) != 0;
+        var kiddyPoolSlot = (isStatic? -1 : 0) + (Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2);  // if the method is parametric
+
+        System.out.println(internalName + "." + methodName + methodDescriptor);
+        System.out.println("isStatic " + isStatic + " kiddyPoolSlot " + kiddyPoolSlot);
+
         return new MethodVisitor(ASM9, delegate) {
           private String ldcConstant;
           private Object constantValue;
@@ -335,6 +340,14 @@ public class VMRewriter {
               mv.visitVarInsn(ALOAD, 0);
               mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
             }
+          }
+
+          @Override
+          public void visitVarInsn(int opcode, int varIndex) {
+            if (parametricMethod && varIndex >= kiddyPoolSlot) {
+              varIndex++;
+            }
+            super.visitVarInsn(opcode, varIndex);
           }
 
           @Override
@@ -392,6 +405,7 @@ public class VMRewriter {
             }
 
             var parametricOwner = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
+            var parametricCall = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(cd -> cd.methodParametricSet.contains(new Method(name, descriptor))).orElse(false);
 
             switch (opcode) {
               case INVOKESPECIAL -> {
@@ -409,7 +423,7 @@ public class VMRewriter {
                 }
               }
               case INVOKESTATIC -> {
-                if (parametricOwner && constantValue != null) {
+                if (parametricCall && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -477,7 +491,7 @@ public class VMRewriter {
 
           @Override
           public void visitMaxs(int maxStack, int maxLocals) {
-            super.visitMaxs(maxStack + 1, maxLocals);
+            super.visitMaxs(maxStack + 1, maxLocals + 1);
           }
 
           @Override
