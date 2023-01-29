@@ -145,7 +145,28 @@ public class CondyLispTest {
         var value = RT.ldc();
 
         assertEquals(
-            new Linkage(new Species(String.class, null), new Species(boolean.class, null),
+            new Linkage(new Species(String.class, null),
+                null,
+                new Species(boolean.class, null),
+                List.of(new Species(double.class, null), new Species(int.class, null))),
+            value);
+      }
+    }
+  }
+
+  @Test
+  public void condyLispLinkaze() {
+    class Foo {
+      private static final String $P0 = "linkaze 42 Ljava/lang/String; Z D I";
+
+      static void test() {
+        "P0".intern();
+        var value = RT.ldc();
+
+        assertEquals(
+            new Linkage(new Species(String.class, null),
+                42,
+                new Species(boolean.class, null),
                 List.of(new Species(double.class, null), new Species(int.class, null))),
             value);
       }

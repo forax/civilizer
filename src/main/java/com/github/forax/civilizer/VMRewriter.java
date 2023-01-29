@@ -269,6 +269,7 @@ public class VMRewriter {
 
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        var parametricMethod = classData.methodParametricSet.contains(new Method(methodName, methodDescriptor));
         MethodVisitor delegate;
         if (classData.parametric && methodName.equals("<init>")) { // need to initialize the kiddy pool
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
@@ -282,8 +283,8 @@ public class VMRewriter {
               if (opcode == INVOKESPECIAL && owner.equals(supername) && name.equals("<init>")) {
                 super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                 mv.visitVarInsn(ALOAD, 0);
-                var slot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;
-                mv.visitVarInsn(ALOAD, slot);
+                var kiddyPoolSlot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // class is parametric
+                mv.visitVarInsn(ALOAD, kiddyPoolSlot);
                 mv.visitFieldInsn(PUTFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
 
                 // init defaults
@@ -295,7 +296,7 @@ public class VMRewriter {
                   var constantValue = constant.startsWith("P") ? condy : constant;
                   var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(field.descriptor));
                   if (!(constantValue instanceof ConstantDynamic)) {
-                    mv.visitVarInsn(ALOAD, slot); // load $kiddyPool
+                    mv.visitVarInsn(ALOAD, kiddyPoolSlot); // load $kiddyPool
                     desc = desc.insertParameterTypes(0, ConstantDescs.CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("initDefault", desc.descriptorString(), BSM_INIT_DEFAULT, constant);
@@ -312,17 +313,28 @@ public class VMRewriter {
             }
           };
         } else {
-          delegate = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
+          if (parametricMethod) {
+            var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
+            desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+            delegate = super.visitMethod(access, methodName, desc.descriptorString(), signature, exceptions);
+          } else {
+            delegate = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
+          }
         }
 
+        var kiddyPoolSlot = 1 + Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // if the method is parametric
         return new MethodVisitor(ASM9, delegate) {
           private String ldcConstant;
           private Object constantValue;
           private boolean removeDUP;
 
           private void loadKiddyPool() {
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+            if (parametricMethod) {
+              mv.visitVarInsn(ALOAD, kiddyPoolSlot);
+            } else {
+              mv.visitVarInsn(ALOAD, 0);
+              mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+            }
           }
 
           @Override
@@ -379,11 +391,11 @@ public class VMRewriter {
               return;
             }
 
-            var parametric = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
+            var parametricOwner = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
 
             switch (opcode) {
               case INVOKESPECIAL -> {
-                if (parametric && constantValue != null) {
+                if (parametricOwner && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -397,7 +409,7 @@ public class VMRewriter {
                 }
               }
               case INVOKESTATIC -> {
-                if (parametric && constantValue != null) {
+                if (parametricOwner && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -410,7 +422,7 @@ public class VMRewriter {
                 }
               }
               case INVOKEVIRTUAL, INVOKEINTERFACE -> {
-                if (parametric && constantValue != null) {
+                if (parametricOwner && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);

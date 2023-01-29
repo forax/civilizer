@@ -293,7 +293,8 @@ public class RT {
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
-      case "linkage" -> new Linkage(asSpecies(args[0]), asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
+      case "linkage" -> new Linkage(asSpecies(args[0]), null, asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
+      case "linkaze" -> new Linkage(asSpecies(args[0]), args[1], asSpecies(args[2]), Arrays.stream(args).skip(3).map(RT::asSpecies).toList());
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }
