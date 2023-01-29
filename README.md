@@ -52,12 +52,14 @@ There are two kinds of constant pool constants,
 
 To specify a new constant, the rewriter recognize static final String that starts with $P or $KP and
 transforms them to constant.
-Each constant can be initialized with a kind of LISP that recognize the actions
+Each constant can be initialized with a kind of LISP that recognizes the instructions:
 - `species` <class> <parameter>? to create a species,
 - `list.of` <args>... to create a list,
 - `list.get` <list> <index> to extract the nth item of a list,
-- `classData` <arg> that extract the argument of the parametric class or uses <arg> if no argument is specified. 
-- `methodData` <arg> that extract the argument of the parametric method or uses <arg> if no argument is specified.
+- `classData` <arg> that extract the argument of the parametric class or uses <arg> if no argument is specified,
+- `methodData` <arg> that extract the argument of the parametric method or uses <arg> if no argument is specified,
+- `linkage` <owner> <returnType> <parameterTypes...> to specify a method signature,
+- `linkaze` <owner> <parameters> <returnType> <parameterTypes...> to specify a parametric method signature.
 
 The arguments of the generics are available at runtime using to forms
 - [Species](src/main/java/com/github/forax/civilizer/vm/Species.java) that specify a generics
