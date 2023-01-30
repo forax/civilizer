@@ -3,7 +3,6 @@ package com.github.forax.civilizer.species;
 import com.github.forax.civilizer.demo.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Array;
@@ -14,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@Disabled
 public class ValueSpecializedTest {
   @Parametric("P2")
   static class SimpleList<E> {
