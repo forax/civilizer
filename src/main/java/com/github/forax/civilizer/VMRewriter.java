@@ -55,6 +55,7 @@ public class VMRewriter {
   record ClassData(String internalName,
                    boolean parametric,
                    HashMap<String, ConstantDynamic> condyMap,
+                   HashSet<String> condyFieldAccessors,
                    LinkedHashMap<Field,String> fieldRestrictionMap,
                    HashSet<Method> methodParametricSet) {}
   record Analysis(HashMap<String,ClassData> classDataMap) {
@@ -115,6 +116,7 @@ public class VMRewriter {
 
   private static ClassData analyze(byte[] buffer) {
     var condyMap = new HashMap<String, ConstantDynamic>();
+    var condyFieldAccessors = new HashSet<String> ();
     var fieldRestrictionMap = new LinkedHashMap<Field,String>();
     var methodParametricSet = new HashSet<Method>();
 
@@ -131,10 +133,23 @@ public class VMRewriter {
         internalName = name;
       }
 
+      private AnnotationVisitor parametricAnnotationVisitor() {
+        return new AnnotationVisitor(ASM9) {
+          @Override
+          public void visit(String name, Object value) {
+            if (!"".equals(value)) {
+              // an accessor must be generated
+              condyFieldAccessors.add("$" + value);
+            }
+          }
+        };
+      }
+
       @Override
       public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
         if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
           parametric = true;
+          return parametricAnnotationVisitor();
         }
         return null;
       }
@@ -174,6 +189,10 @@ public class VMRewriter {
           var condy = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
           //System.out.println("  condy: " + condy);
           condyMap.put(condyName, condy);
+          // an accessor must be generated ?
+          if (fieldName.startsWith("$KP")) {
+            condyFieldAccessors.add(fieldName);
+          }
         }
 
         return new FieldVisitor(ASM9) {
@@ -202,6 +221,7 @@ public class VMRewriter {
           public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
             if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
               methodParametricSet.add(new Method(methodName, methodDescriptor));
+              return parametricAnnotationVisitor();
             }
             return null;
           }
@@ -210,7 +230,7 @@ public class VMRewriter {
     };
     reader.accept(cv, 0);
 
-    return new ClassData(cv.internalName, cv.parametric, condyMap, fieldRestrictionMap, methodParametricSet);
+    return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet);
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
@@ -237,15 +257,15 @@ public class VMRewriter {
         if ((name.startsWith("$KP") || name.startsWith("$P"))) {
           var condyName = name.substring(1);
           var condy = classData.condyMap.get(condyName);
-          //if (name.startsWith("$KP")) {  // FIXME
-            // we also need accessors
+          if (classData.condyFieldAccessors.contains(name)) {
+            // we also need accessors for the constant dynamic referenced from outside
             var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, name, "()Ljava/lang/Object;", null, null);
             mv.visitCode();
             mv.visitLdcInsn(condy);
             mv.visitInsn(ARETURN);
             mv.visitMaxs(1, 0);
             mv.visitEnd();
-          //}
+          }
           return null;
         }
         return super.visitField(access, name, descriptor, signature, value);
