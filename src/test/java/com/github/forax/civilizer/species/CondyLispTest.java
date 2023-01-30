@@ -201,7 +201,7 @@ public class CondyLispTest {
     }
   }
 
-  private static Object bsmValue(Object value) {
+  private static int bsmValue(Integer value) {
     return value == null ? 42 : value;
   }
 
@@ -209,7 +209,7 @@ public class CondyLispTest {
   public void ldcClassDataNoArgument() {
     @Parametric("P0")
     class Foo<T> {
-      private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
       private static final String $KP0 = "classData";
 
       Object value() {
@@ -224,7 +224,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data<T>() {
-    private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
     private static final String $KP0 = "classData";
 
     Object value() {

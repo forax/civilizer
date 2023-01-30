@@ -151,6 +151,7 @@ public class VMRewriter {
             }
             yield condy;
           }
+          case '(' -> Type.getMethodType(arg);
           case '"' -> arg.substring(1, arg.length() - 1);
           default -> {
             if (arg.indexOf('.') != -1) {

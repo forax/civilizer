@@ -114,6 +114,21 @@ public class RT {
     }
   }
 
+  private static Object callBSM(Lookup speciesLookup, Species species, String bsmPoolRef, Object parameters) {
+    if (bsmPoolRef.isEmpty()) {  // useful for debugging
+      return parameters;
+    }
+    try {
+      var bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+      var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
+      return bsm.invoke(parameters);
+    } catch (Error e) {
+      throw e;
+    } catch(Throwable e) {
+      throw (LinkageError) new LinkageError().initCause(e);
+    }
+  }
+
   private static Class<?> kiddyPoolClass(Lookup lookup, Species species) {
     var parametric = species.raw().getAnnotation(Parametric.class);
     if (parametric == null) {
@@ -121,18 +136,7 @@ public class RT {
     }
     var speciesLookup = privateSpeciesLookup(lookup, species);
     var bsmPoolRef = parametric.value();
-    var parameters = species.parameters();
-    if (!bsmPoolRef.isEmpty()) {
-      try {
-        var bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
-        var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
-        parameters = bsm.invoke(parameters);
-      } catch (Error e) {
-        throw e;
-      } catch(Throwable e) {
-        throw (LinkageError) new LinkageError().initCause(e);
-      }
-    }
+    var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
     var keySpecies = new Species(species.raw(), parameters);
     return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies, sp -> {
       return createKiddyPoolClass(speciesLookup, sp.raw(), new ClassDataPair(sp.parameters(), null));
@@ -148,18 +152,7 @@ public class RT {
     }
     var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species);
     var bsmPoolRef = parametric.value();
-    var parameters = methodSpecies.parameters;
-    if (!bsmPoolRef.isEmpty()) {
-      try {
-        var bsmPool = speciesLookup.findStatic(methodSpecies.species.raw(), "$" + bsmPoolRef, methodType(Object.class));
-        var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
-        parameters = bsm.invoke(parameters);
-      } catch (Error e) {
-        throw e;
-      } catch(Throwable e) {
-        throw (LinkageError) new LinkageError().initCause(e);
-      }
-    }
+    var parameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.parameters);
     var keyMethodSpecies = new MethodSpecies(methodSpecies.species, parameters, methodSpecies.name, methodSpecies.descriptor);
     return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
       return createKiddyPoolClass(speciesLookup, msp.species.raw(), new ClassDataPair(null, msp.parameters));
@@ -379,11 +372,10 @@ public class RT {
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
       case "linkage" -> new Linkage(asSpecies(args[0]), null, asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
       case "linkaze" -> new Linkage(asSpecies(args[0]), args[1], asSpecies(args[2]), Arrays.stream(args).skip(3).map(RT::asSpecies).toList());
-      case "lambda" -> {
-        // the constant arguments are inserted after the first parameter, unlike Java lambdas which inserted before the first parameter
+      case "mh" -> {
         yield MethodHandles.insertArguments(
-            lookup.findStatic((Class<?>) args[0], (String) args[1], MethodType.genericMethodType(args.length - 1)),
-            1, Arrays.stream(args).skip(2).toArray());
+            lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
+            1, Arrays.stream(args).skip(3).toArray());
       }
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
