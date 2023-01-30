@@ -93,8 +93,8 @@ public class VMRewriter {
       "bsm_init_default",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
-  private static final Handle BSM_PUT_VALUE_CHECK = new Handle(H_INVOKESTATIC, RT_INTERNAL,
-      "bsm_put_value_check",
+  private static final Handle BSM_PUT_VALUE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_put_value",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
   private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT_INTERNAL,
@@ -250,7 +250,7 @@ public class VMRewriter {
     var supername = reader.getSuperName();
     var classDataMap = analysis.classDataMap;
     var classData = analysis.classDataMap.get(internalName);
-    var writer = new ClassWriter(reader, 0);
+    var writer = new ClassWriter(0);
     var cv = new ClassVisitor(ASM9, writer) {
       @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
@@ -401,13 +401,13 @@ public class VMRewriter {
               if (constant != null) {
                 var condy = findCondy(constant);
                 var constantValue = constant.startsWith("P") ? condy : constant;
-                var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(descriptor), ClassDesc.ofDescriptor(descriptor));
+                var desc = MethodTypeDesc.of(ConstantDescs.CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
                 if (!(constantValue instanceof ConstantDynamic)) {
                   loadKiddyPool();
                   desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
                 }
-                mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_PUT_VALUE_CHECK, constant);
-                // fallthrough
+                mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_PUT_VALUE, constant);
+                return;
               }
             }
             super.visitFieldInsn(opcode, owner, name, descriptor);

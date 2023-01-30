@@ -203,7 +203,7 @@ public class RT {
     }
   }
 
-  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE_CHECK;
+  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE;
   static {
     var lookup = MethodHandles.lookup();
     try {
@@ -212,7 +212,7 @@ public class RT {
       BSM_NEW = lookup.findStatic(RT.class, "bsm_new", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_INIT_DEFAULT = lookup.findStatic(RT.class, "bsm_init_default", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_PUT_VALUE_CHECK = lookup.findStatic(RT.class, "bsm_put_value_check", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
+      BSM_PUT_VALUE = lookup.findStatic(RT.class, "bsm_put_value", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
@@ -318,16 +318,16 @@ public class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
-  public static CallSite bsm_put_value_check(Lookup lookup, String name, MethodType type, Object constant) {
+  public static CallSite bsm_put_value(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchFieldException, IllegalAccessException {
     //System.out.println("bsm_put_value_check " + type + " " + constant);
 
     if (constant instanceof Species species) {
-      var identity = MethodHandles.identity(type.parameterType(0));
-      var target = identity.asType(methodType(type.returnType(), species.raw())).asType(type);
+      var setter = lookup.findSetter(type.parameterType(0), name, type.parameterType(1));
+      var target = setter.asType(methodType(type.returnType(), type.parameterType(0), species.raw())).asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsmInitDefault = MethodHandles.insertArguments(BSM_PUT_VALUE_CHECK, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
+      var bsmInitDefault = MethodHandles.insertArguments(BSM_PUT_VALUE, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
       return new InliningCache(type, lookup, bsmInitDefault, kiddyPoolRef);
     }
 
