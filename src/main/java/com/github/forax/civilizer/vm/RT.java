@@ -367,14 +367,14 @@ public class RT {
 
     return switch (action) {
       case "classData" -> {
+        assert args.length == 0;
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        var parameters =  classDataPair.speciesParameters == null ? args[0] : classDataPair.speciesParameters;
-        yield args.length == 2 ? ((MethodHandle) args[1]).invoke(parameters) : parameters;
+        yield classDataPair.speciesParameters;
       }
       case "methodData" -> {
+        assert args.length == 0;
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        var parameters = classDataPair.methodParameters == null ? args[0] : classDataPair.methodParameters;
-        yield args.length == 2 ? ((MethodHandle) args[1]).invoke(parameters) : parameters;
+        yield classDataPair.methodParameters;
       }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);

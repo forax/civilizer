@@ -11,7 +11,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 public class CondyLispTest {
@@ -211,7 +210,7 @@ public class CondyLispTest {
     @Parametric("P0")
     class Foo<T> {
       private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
-      private static final String $KP0 = "classData 53";
+      private static final String $KP0 = "classData";
 
       Object value() {
         "KP0".intern();
@@ -226,7 +225,7 @@ public class CondyLispTest {
   @Parametric("P0")
   record Data<T>() {
     private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
-    private static final String $KP0 = "classData 54";
+    private static final String $KP0 = "classData";
 
     Object value() {
       "KP0".intern();
@@ -258,7 +257,7 @@ public class CondyLispTest {
   @Parametric("")
   record Data3<T>() {
     private static final String $P0 = "list.of Ljava/lang/Object;";
-    private static final String $KP0 = "classData P0;";
+    private static final String $KP0 = "classData";
 
     Object value() {
       "KP0".intern();
@@ -290,7 +289,7 @@ public class CondyLispTest {
 
   @Parametric("")
   class MethodData {
-    private static final String $KP0 = "methodData 55";
+    private static final String $KP0 = "methodData";
 
     @Parametric("")
     static Object value() {
