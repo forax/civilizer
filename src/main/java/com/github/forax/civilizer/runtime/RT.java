@@ -21,18 +21,24 @@ public final class RT {
     return (clazz.getModifiers() & ACC_PRIMITIVE) != 0;
   }
 
-  /*public static Class<?> asPrimaryType(Class<?> type) {
-    if (type.isPrimitive()) {
-      throw new IllegalArgumentException("component is primitive");
-    }
-    return MethodType.fromMethodDescriptorString("()L" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
-  }*/
+
 
   public static Class<?> asSecondaryType(Class<?> type) {
     if (type.isPrimitive()) {
       throw new IllegalArgumentException("component is primitive");
     }
     return MethodType.fromMethodDescriptorString("()Q" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
+  }
+
+  private static Class<?> asPrimaryType(Class<?> type) {
+    return MethodType.fromMethodDescriptorString("()L" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
+  }
+
+  public static boolean isSecondaryType(Class<?> type) {
+    if (!isZeroDefault(type)) {
+      return false;
+    }
+    return asPrimaryType(type) != type;
   }
 
   @SuppressWarnings("unchecked")
