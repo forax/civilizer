@@ -90,16 +90,25 @@ class SimpleList<E> {
   private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
   private static final String $KP0 = "classData P1;";
   private static final String $KP1 = "list.get KP0; 0";
+  private static final String $KP2 = "linkage LSimpleList; V KP1;";
 
   private E[] elements;
   private int size;
 
-  SimpleList() {
+  public SimpleList() {
     super(); // otherwise the annotation below will be attached to super()
     "KP1".intern();
     @SuppressWarnings("unchecked")
     var elements = (E[]) new Object[16];
     this.elements = elements;
+  }
+  
+  @TypeRestriction("KP2")
+  public void add(E element) {
+    if (size == elements.length) {
+      elements = Arrays.copyOf(elements, elements.length << 1);
+    }
+    elements[size++] = element;
   }
   ...
 }
@@ -139,8 +148,8 @@ for the VM, a reference to a `$KP` is a constant once JITed (the implementation 
 This should ensure proper performance, at the expense of the constant pool being quite bloated.
 
 Parametric class instantiation works, parametric method instantiation work, array specialization works,
-use site method specialization works, raw types are supported (using the argument of `classData`/`methodData`).
-Type restriction (with `@TypeRestriction`) on fields are implemented (specialization of fields is not implemented).
+use site method specialization works, raw types are supported (using the bsm referenced by the annotation `Parametric`).
+Type restriction (with `@TypeRestriction`) on fields and methods are implemented (specialization of fields is not implemented).
 
 Inheritance of generic classes and interface default methods are not supported.
 
