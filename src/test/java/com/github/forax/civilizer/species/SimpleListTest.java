@@ -14,7 +14,8 @@ public class SimpleListTest {
   static class SimpleList<E> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
-    private static final String $KP0 = "classData P1;";
+    private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
+    private static final String $KP0 = "classData P1; P2;";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP0;";
     private static final String $KP3 = "linkage KP2; KP2;";
@@ -92,13 +93,12 @@ public class SimpleListTest {
 
   @Test
   @SuppressWarnings({"rawtypes", "unchecked"})
-  public void specializedAndRawStringList() {
+  public void specializedButErasedAndRawStringList() {
     "P_string_3".intern();
     var list = new SimpleList();
 
     list.add("foo");
-
-    assertThrows(ArrayStoreException.class, () -> list.add(3));
+    list.add(3);
     assertEquals("foo", list.get(0));
   }
 

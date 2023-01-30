@@ -1,7 +1,6 @@
 package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.demo.Complex;
-import com.github.forax.civilizer.species.CondyLispTest.MethodData;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,8 @@ public class ValueSpecializedTest {
   static class SimpleList<E> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
-    private static final String $KP0 = "classData P1;";
+    private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
+    private static final String $KP0 = "classData P1; P2;";
     private static final String $KP1 = "list.get KP0; 0";
 
     private E[] elements;
@@ -88,6 +88,18 @@ public class ValueSpecializedTest {
     var list = new SimpleList<Complex>();
 
     assertThrows(NullPointerException.class, () -> list.add(null));
+  }
+
+  @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public void specializedComplexAndRawAdd() {
+    "P3".intern();
+    var list = new SimpleList();
+
+    list.add(Complex.of(2, 4));
+
+    assertThrows(ArrayStoreException.class, () -> list.add(3));
+    assertEquals(Complex.of(2, 4), list.get(0));
   }
 
 

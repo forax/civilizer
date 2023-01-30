@@ -20,6 +20,7 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static java.lang.invoke.MethodType.methodType;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
@@ -36,6 +37,20 @@ public class RT {
   public static Object ldc() {
     throw new LinkageError("this method should be rewritten by the rewriter, so never reach that point");
   }
+
+  public static Object erase(/*List<Species>*/Object parameters, /*List<Species>*/Object defaultSpecies) {
+    var parameterList = ((List<?>) parameters).stream().map(o -> (Species) o).toList();
+    var defaultSpeciesList = ((List<?>) defaultSpecies).stream().map(o -> (Species) o).toList();
+    if (parameterList.size() != defaultSpeciesList.size()) {
+      throw new LinkageError("instantiation arguments " + parameters + " and default arguments " + defaultSpeciesList + " have no the same size");
+    }
+    return IntStream.range(0, parameterList.size())
+        .mapToObj(i -> {
+          var species = parameterList.get(i);
+          return com.github.forax.civilizer.runtime.RT.isSecondaryType(species.raw()) ? species : defaultSpeciesList.get(i);
+        }).toList();
+  }
+
 
   private static Class<?> createKiddyPoolClass(Lookup lookup, Class<?> type, Object classData) {
     var input = type.getResourceAsStream("/" + type.getName().replace('.', '/') + ".class");
@@ -306,23 +321,31 @@ public class RT {
     throw new IllegalStateException("object " + o + " is not a species or a class");
   }
 
-  public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws IllegalAccessException {
+  public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
     //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
     return switch (action) {
       case "classData" -> {
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        yield classDataPair.speciesParameters == null ? args[0] : classDataPair.speciesParameters;
+        var parameters =  classDataPair.speciesParameters == null ? args[0] : classDataPair.speciesParameters;
+        yield args.length == 2 ? ((MethodHandle) args[1]).invoke(parameters) : parameters;
       }
       case "methodData" -> {
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        yield classDataPair.methodParameters == null ? args[0] : classDataPair.methodParameters;
+        var parameters = classDataPair.methodParameters == null ? args[0] : classDataPair.methodParameters;
+        yield args.length == 2 ? ((MethodHandle) args[1]).invoke(parameters) : parameters;
       }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
       case "linkage" -> new Linkage(asSpecies(args[0]), null, asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
       case "linkaze" -> new Linkage(asSpecies(args[0]), args[1], asSpecies(args[2]), Arrays.stream(args).skip(3).map(RT::asSpecies).toList());
+      case "lambda" -> {
+        // the constant arguments are inserted after the first parameter, unlike Java lambdas which inserted before the first parameter
+        yield MethodHandles.insertArguments(
+            lookup.findStatic((Class<?>) args[0], (String) args[1], MethodType.genericMethodType(args.length - 1)),
+            1, Arrays.stream(args).skip(2).toArray());
+      }
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }
