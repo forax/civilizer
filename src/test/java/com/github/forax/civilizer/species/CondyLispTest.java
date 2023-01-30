@@ -30,6 +30,34 @@ public class CondyLispTest {
   }
 
   @Test
+  public void ldcDouble() {
+    class Foo {
+      private static final String $P0 = "4.0";
+
+      static void test() {
+        "P0".intern();
+        var value = RT.ldc();
+        assertEquals(4.0, value);
+      }
+    }
+  }
+
+  @Test
+  public void ldcString() {
+    class Foo {
+      private static final String $P0 = """
+          "foo"\
+          """;
+
+      static void test() {
+        "P0".intern();
+        var value = RT.ldc();
+        assertEquals("foo", value);
+      }
+    }
+  }
+
+  @Test
   public void ldcBasicType() {
     class Foo {
       private static final String $P0 = "Z";

@@ -67,7 +67,7 @@ public class VMRewriter {
   }
 
 
-  private static String RT_INTERNAL = RT.class.getName().replace('.', '/');
+  private static final String RT_INTERNAL = RT.class.getName().replace('.', '/');
   private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_ldc",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
@@ -151,7 +151,13 @@ public class VMRewriter {
             }
             yield condy;
           }
-          default -> Integer.valueOf(arg);
+          case '"' -> arg.substring(1, arg.length() - 1);
+          default -> {
+            if (arg.indexOf('.') != -1) {
+              yield Double.parseDouble(arg);
+            }
+            yield Integer.valueOf(arg);
+          }
         };
       }
 
