@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
@@ -47,7 +48,6 @@ import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
-import static org.objectweb.asm.Opcodes.RETURN;
 
 public class VMRewriter {
   record Field(String name, String descriptor) {}
@@ -57,7 +57,8 @@ public class VMRewriter {
                    HashMap<String, ConstantDynamic> condyMap,
                    HashSet<String> condyFieldAccessors,
                    LinkedHashMap<Field,String> fieldRestrictionMap,
-                   HashSet<Method> methodParametricSet) {}
+                   HashSet<Method> methodParametricSet,
+                   HashMap<Method, String> methodRestrictionMap) {}
   record Analysis(HashMap<String,ClassData> classDataMap) {
     void dump() {
       for(var classData: classDataMap.values()) {
@@ -97,6 +98,11 @@ public class VMRewriter {
       "bsm_put_value",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
+  private static final Handle BSM_METHOD_RESTRICTION = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_method_restriction",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      false);
+
   private static final Handle BSM_CONDY = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_condy",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;",
@@ -119,6 +125,7 @@ public class VMRewriter {
     var condyFieldAccessors = new HashSet<String> ();
     var fieldRestrictionMap = new LinkedHashMap<Field,String>();
     var methodParametricSet = new HashSet<Method>();
+    var methodRestrictionMap = new HashMap<Method, String>();
 
     var reader = new ClassReader(buffer);
     var cv = new ClassVisitor(ASM9) {
@@ -137,10 +144,25 @@ public class VMRewriter {
         return new AnnotationVisitor(ASM9) {
           @Override
           public void visit(String name, Object value) {
+            if (!name.equals("value")) {
+              throw new AssertionError("Parametric is malformed !");
+            }
             if (!"".equals(value)) {
               // an accessor must be generated
               condyFieldAccessors.add("$" + value);
             }
+          }
+        };
+      }
+
+      private AnnotationVisitor restrictionAnnotationVisitor(Consumer<String> valueConsumer) {
+        return new AnnotationVisitor(ASM9) {
+          @Override
+          public void visit(String name, Object value) {
+            if (!name.equals("value")) {
+              throw new AssertionError("TypeRestriction is malformed !");
+            }
+            valueConsumer.accept((String) value);
           }
         };
       }
@@ -199,15 +221,7 @@ public class VMRewriter {
           @Override
           public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
             if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
-              return new AnnotationVisitor(ASM9) {
-                @Override
-                public void visit(String name, Object value) {
-                  if (!name.equals("value")) {
-                    throw new AssertionError("TypeRestriction is malformed !");
-                  }
-                  fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), (String) value);
-                }
-              };
+              return restrictionAnnotationVisitor(value -> fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), value));
             }
             return null;
           }
@@ -223,6 +237,11 @@ public class VMRewriter {
               methodParametricSet.add(new Method(methodName, methodDescriptor));
               return parametricAnnotationVisitor();
             }
+            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
+              return restrictionAnnotationVisitor(value -> {
+                methodRestrictionMap.put(new Method(methodName, methodDescriptor), value);
+              });
+            }
             return null;
           }
         };
@@ -230,7 +249,7 @@ public class VMRewriter {
     };
     reader.accept(cv, 0);
 
-    return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet);
+    return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap);
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
@@ -367,6 +386,27 @@ public class VMRewriter {
           private String ldcConstant;
           private Object constantValue;
           private boolean removeDUP;
+
+          @Override
+          public void visitCode() {
+            super.visitCode();
+            var constant = classData.methodRestrictionMap.get(new Method(methodName, methodDescriptor));
+            if (constant != null) {
+              var slot = isStatic? 0 : 1;
+              for(var type : Type.getArgumentTypes(methodDescriptor)) {
+                mv.visitVarInsn(type.getOpcode(ILOAD), slot);
+                slot += type.getSize();
+              }
+              var condy = findCondy(constant);
+              var constantValue = constant.startsWith("P") ? condy : constant;
+              var desc = MethodTypeDesc.ofDescriptor(methodDescriptor).changeReturnType(ConstantDescs.CD_void);
+              if (!(constantValue instanceof ConstantDynamic)) {
+                loadKiddyPool();
+                desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
+              }
+              mv.visitInvokeDynamicInsn(methodName, desc.descriptorString(), BSM_METHOD_RESTRICTION, constant);
+            }
+          }
 
           private void loadKiddyPool() {
             if (parametricMethod) {
@@ -526,7 +566,13 @@ public class VMRewriter {
 
           @Override
           public void visitMaxs(int maxStack, int maxLocals) {
-            super.visitMaxs(maxStack + 1, maxLocals + 1);
+            maxStack++;
+            maxLocals++;
+            var constant = classData.methodRestrictionMap.get(new Method(methodName, methodDescriptor));
+            if (constant != null) {  // need to fix the stack
+              maxStack = Math.max(maxStack, Type.getArgumentsAndReturnSizes(methodDescriptor) - 1);
+            }
+            super.visitMaxs(maxStack, maxLocals);
           }
 
           @Override

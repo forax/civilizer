@@ -3,6 +3,7 @@ package com.github.forax.civilizer.species;
 import com.github.forax.civilizer.demo.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
+import com.github.forax.civilizer.vm.TypeRestriction;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Array;
@@ -21,6 +22,8 @@ public class ValueSpecializedTest {
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
     private static final String $KP0 = "classData";
     private static final String $KP1 = "list.get KP0; 0";
+    private static final String $KP2 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; V KP1;";
+    private static final String $KP3 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; KP1; I";
 
     private E[] elements;
     private int size;
@@ -37,6 +40,7 @@ public class ValueSpecializedTest {
       return size;
     }
 
+    @TypeRestriction("KP2")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -44,6 +48,7 @@ public class ValueSpecializedTest {
       elements[size++] = element;
     }
 
+    @TypeRestriction("KP3")
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];
@@ -98,7 +103,7 @@ public class ValueSpecializedTest {
 
     list.add(Complex.of(2, 4));
 
-    assertThrows(ArrayStoreException.class, () -> list.add(3));
+    assertThrows(ClassCastException.class, () -> list.add(3));
     assertEquals(Complex.of(2, 4), list.get(0));
   }
 

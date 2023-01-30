@@ -203,7 +203,7 @@ public class RT {
     }
   }
 
-  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE;
+  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE, BSM_METHOD_RESTRICTION;
   static {
     var lookup = MethodHandles.lookup();
     try {
@@ -213,19 +213,10 @@ public class RT {
       BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_INIT_DEFAULT = lookup.findStatic(RT.class, "bsm_init_default", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
       BSM_PUT_VALUE = lookup.findStatic(RT.class, "bsm_put_value", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
+      BSM_METHOD_RESTRICTION = lookup.findStatic(RT.class, "bsm_method_restriction", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
-  }
-
-  private static MethodHandle specializeInstanceMethod(Linkage linkage, MethodHandle method, MethodType type) {
-    var specializedType = linkage.toMethodType().insertParameterTypes(0, linkage.owner().raw());
-    return method.asType(specializedType).asType(type);
-  }
-
-  private static MethodHandle specializeStaticMethod(Linkage linkage, MethodHandle method, MethodType type) {
-    var specializedType = linkage.toMethodType();
-    return method.asType(specializedType).asType(type);
   }
 
   public static CallSite bsm_ldc(Lookup lookup, String name, MethodType type, Object constant) {
@@ -245,8 +236,7 @@ public class RT {
       var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), linkage.parameters(), name, type.toMethodDescriptorString());
       var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
       var mh = MethodHandles.insertArguments(method, type.parameterCount(), kiddyPoolClass);
-      var target = specializeStaticMethod(linkage, mh, type);
-      return new ConstantCallSite(target);
+      return new ConstantCallSite(mh);
     }
     if (constant instanceof String kiddyPoolRef) {
       var bsmNew = MethodHandles.insertArguments(BSM_STATIC, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
@@ -261,8 +251,7 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findVirtual(type.parameterType(0), name, type.dropParameterTypes(0, 1));
-      var target = specializeInstanceMethod(linkage, method, type);
-      return new ConstantCallSite(target);
+      return new ConstantCallSite(method);
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
@@ -276,8 +265,7 @@ public class RT {
       var init = lookup.findConstructor(owner, type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
       var method = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
-      var target = specializeStaticMethod(linkage, method, type);
-      return new ConstantCallSite(target);
+      return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
       var bsmNew = MethodHandles.insertArguments(BSM_NEW, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
@@ -328,6 +316,22 @@ public class RT {
     }
     if (constant instanceof String kiddyPoolRef) {
       var bsmInitDefault = MethodHandles.insertArguments(BSM_PUT_VALUE, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
+      return new InliningCache(type, lookup, bsmInitDefault, kiddyPoolRef);
+    }
+
+    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+  }
+
+  public static CallSite bsm_method_restriction(Lookup lookup, String name, MethodType type, Object constant) {
+    System.out.println("bsm_method_restriction " + type + " " + constant);
+
+    if (constant instanceof Linkage linkage) {
+      var empty = MethodHandles.empty(type);
+      var target = empty.asType(linkage.toMethodType()).asType(type);
+      return new ConstantCallSite(target);
+    }
+    if (constant instanceof String kiddyPoolRef) {
+      var bsmInitDefault = MethodHandles.insertArguments(BSM_METHOD_RESTRICTION, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
       return new InliningCache(type, lookup, bsmInitDefault, kiddyPoolRef);
     }
 

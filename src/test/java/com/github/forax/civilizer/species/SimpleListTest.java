@@ -1,13 +1,13 @@
 package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.vm.Parametric;
+import com.github.forax.civilizer.vm.TypeRestriction;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class SimpleListTest {
   @Parametric("P2")
@@ -19,6 +19,8 @@ public class SimpleListTest {
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP0;";
     private static final String $KP3 = "linkage KP2; KP2;";
+    private static final String $KP4 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; V KP1;";
+    private static final String $KP5 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP1; I";
 
     private E[] elements;
     private int size;
@@ -35,6 +37,7 @@ public class SimpleListTest {
       return size;
     }
 
+    @TypeRestriction("KP4")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -42,6 +45,7 @@ public class SimpleListTest {
       elements[size++] = element;
     }
 
+    @TypeRestriction("KP5")
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];
@@ -100,33 +104,6 @@ public class SimpleListTest {
     list.add("foo");
     list.add(3);
     assertEquals("foo", list.get(0));
-  }
-
-
-  @Test
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  public void specializedOnlyAddAndRawStringList() {
-    var list = new SimpleList();
-    list.add("foo");
-
-    assertThrows(ClassCastException.class, () -> {
-      "P_string_4".intern();
-      list.add(3);
-    });
-    assertEquals("foo", list.get(0));
-  }
-
-  @Test
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  public void specializedOnlyGetAndRawStringList() {
-    var list = new SimpleList();
-    list.add(3);
-
-    assertThrows(ClassCastException.class, () -> {
-      "P_string_5".intern();
-      list.get(0);
-    });
-    assertEquals(3, list.get(0));
   }
 
 
