@@ -56,8 +56,8 @@ Each constant can be initialized with a kind of LISP that recognizes the instruc
 - `species` <class> <parameter>? creates a species,
 - `list.of` <args>... creates a list,
 - `list.get` <list> <index> extracts the nth item of a list,
-- `classData` <arg> <lambda?>, extracts the argument of the parametric class (uses <arg> if no argument is specified) and then calls the lambda if it exists,
-- `methodData` <arg> <lambda?> extracts the argument of the parametric method (uses <arg> if no argument is specified) and then calls the lambda if it exists,
+- `classData` <arg>, extracts the argument of the parametric class,
+- `methodData` <arg> extracts the argument of the parametric method,
 - `linkage` <owner> <returnType> <parameterTypes...> specifies a method signature,
 - `linkaze` <owner> <parameters> <returnType> <parameterTypes...> specifyies a parametric method signature,
 - `lambda` <class> <name> <constArgs...> creates a method handle with one parameter (the constant arguments are appended after the parameter).
@@ -77,15 +77,17 @@ To specify a species or a linkage of an operation, the rewriter recognize the pa
 ```
 with ref a reference to a $P or a $KP constants and the operation one of the operation above.
 
-In the following code, we first declare the class `SimpleList` as parametric using the annotation `@Parametric`.
-We then extract the argument of the class (in `$KP0`) (or use the species java/lang/Object 
+In the following code, we first declare the class `SimpleList` as parametric using the annotation `@Parametric`,
+the parameter P2 means that the lambda will be executed on the parameters (here to erase the parameters).
+We then extract the argument of the class (in `$KP0`) (or use the species java/lang/Object
 if not defined) and extract the zeroth argument (in `$KP1`).
 In the constructor, the species `KP1` is used to specialize the array creation.
 ```java
-@Parametric
+@Parametric("P2")
 class SimpleList<E> {
   private static final String $P0 = "species Ljava/lang/Object;";
   private static final String $P1 = "list.of P0;";
+  private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
   private static final String $KP0 = "classData P1;";
   private static final String $KP1 = "list.get KP0; 0";
 
