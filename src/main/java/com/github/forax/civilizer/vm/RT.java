@@ -367,12 +367,10 @@ public class RT {
 
     return switch (action) {
       case "classData" -> {
-        assert args.length == 0;
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
         yield classDataPair.speciesParameters;
       }
       case "methodData" -> {
-        assert args.length == 0;
         var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
         yield classDataPair.methodParameters;
       }
