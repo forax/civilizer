@@ -236,7 +236,7 @@ public class VMRewriter {
         if ((name.startsWith("$KP") || name.startsWith("$P"))) {
           var condyName = name.substring(1);
           var condy = classData.condyMap.get(condyName);
-          if (name.startsWith("$KP")) {
+          //if (name.startsWith("$KP")) {  // FIXME
             // we also need accessors
             var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, name, "()Ljava/lang/Object;", null, null);
             mv.visitCode();
@@ -244,7 +244,7 @@ public class VMRewriter {
             mv.visitInsn(ARETURN);
             mv.visitMaxs(1, 0);
             mv.visitEnd();
-          }
+          //}
           return null;
         }
         return super.visitField(access, name, descriptor, signature, value);

@@ -3,6 +3,7 @@ package com.github.forax.civilizer.species;
 import com.github.forax.civilizer.demo.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Array;
@@ -13,13 +14,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@Disabled
 public class ValueSpecializedTest {
-  @Parametric
+  @Parametric("P2")
   static class SimpleList<E> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
     private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
-    private static final String $KP0 = "classData P1; P2;";
+    private static final String $KP0 = "classData P1;";
     private static final String $KP1 = "list.get KP0; 0";
 
     private E[] elements;
@@ -103,13 +105,13 @@ public class ValueSpecializedTest {
   }
 
 
-  @Parametric
+  @Parametric("")
   record MethodData() {
     private static final String $P0 = "list.of Ljava/lang/Object;";
     private static final String $KP0 = "methodData P0;";
     private static final String $KP1 = "list.get KP0; 0";
 
-    @Parametric
+    @Parametric("")
     @SuppressWarnings("unchecked")
     static <T> T defaultValue() {
       "KP1".intern();

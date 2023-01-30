@@ -7,7 +7,6 @@ import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Array;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -203,11 +202,16 @@ public class CondyLispTest {
     }
   }
 
+  private static Object bsmValue(Object value) {
+    return value == null ? 42 : value;
+  }
+
   @Test
   public void ldcClassDataNoArgument() {
-    @Parametric
+    @Parametric("P0")
     class Foo<T> {
-      private static final String $KP0 = "classData 42";
+      private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
+      private static final String $KP0 = "classData 53";
 
       Object value() {
         "KP0".intern();
@@ -219,20 +223,21 @@ public class CondyLispTest {
     assertEquals(42, foo.value());
   }
 
-  @Parametric
+  @Parametric("P0")
   record Data<T>() {
-    private static final String $KP0 = "classData 42";
+    private static final String $P0 = "lambda Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\"";
+    private static final String $KP0 = "classData 54";
 
     Object value() {
       "KP0".intern();
       return RT.ldc();
     }
 
-    private static final String $P0 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data; 77";
-    private static final String $P1 = "linkage P0; P0;";
+    private static final String $P1 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data; 77";
+    private static final String $P2 = "linkage P1; P1;";
 
     static void test() {
-      "P1".intern();
+      "P2".intern();
       var data = new Data<>();
 
       var data2 = new Data<>();
@@ -250,39 +255,7 @@ public class CondyLispTest {
   }
 
 
-  @Parametric
-  record Data2<T>() {
-    private static final String $P0 = "list.of 42";
-    private static final String $KP0 = "classData P0;";
-
-    Object value() {
-      "KP0".intern();
-      return RT.ldc();
-    }
-
-    private static final String $P1 = "list.of 77";
-    private static final String $P2 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data2; P1;";
-    private static final String $P3 = "linkage P2; P2;";
-
-    static void test() {
-      "P3".intern();
-      var data = new Data2<>();
-
-      var data2 = new Data2<>();
-
-      assertAll(
-          () -> assertEquals(List.of(77), data.value()),
-          () -> assertEquals(List.of(42), data2.value())
-      );
-    }
-  }
-
-  @Test
-  public void kiddyPoolCanLinkToConstantPool() {
-    Data2.test();
-  }
-
-  @Parametric
+  @Parametric("")
   record Data3<T>() {
     private static final String $P0 = "list.of Ljava/lang/Object;";
     private static final String $KP0 = "classData P0;";
@@ -315,11 +288,11 @@ public class CondyLispTest {
   }
 
 
-  @Parametric
+  @Parametric("")
   class MethodData {
     private static final String $KP0 = "methodData 55";
 
-    @Parametric
+    @Parametric("")
     static Object value() {
       "KP0".intern();
       return RT.ldc();

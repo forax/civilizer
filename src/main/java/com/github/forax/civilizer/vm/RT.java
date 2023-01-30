@@ -17,6 +17,7 @@ import java.lang.invoke.MethodHandles.Lookup.ClassOption;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -39,8 +40,11 @@ public class RT {
   }
 
   public static Object erase(/*List<Species>*/Object parameters, /*List<Species>*/Object defaultSpecies) {
-    var parameterList = ((List<?>) parameters).stream().map(o -> (Species) o).toList();
+    var parameterList = parameters == null ? null: ((List<?>) parameters).stream().map(o -> (Species) o).toList();
     var defaultSpeciesList = ((List<?>) defaultSpecies).stream().map(o -> (Species) o).toList();
+    if (parameters == null) {
+      return defaultSpecies;
+    }
     if (parameterList.size() != defaultSpeciesList.size()) {
       throw new LinkageError("instantiation arguments " + parameters + " and default arguments " + defaultSpeciesList + " have no the same size");
     }
@@ -102,27 +106,63 @@ public class RT {
   private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
   private static final HashMap<MethodSpecies, Class<?>> KIDDY_POOL_METH_CACHE = new HashMap<>();
 
-  private static Class<?> kiddyPoolClass(Lookup lookup, Species species) throws IllegalAccessException {
-    return KIDDY_POOL_CACHE.computeIfAbsent(species, sp -> {
-      Lookup speciesLookup;
+  private static Lookup privateSpeciesLookup(Lookup lookup, Species species) {
+    try {
+       return MethodHandles.privateLookupIn(species.raw(), lookup);
+    } catch (IllegalAccessException e) {
+      throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+    }
+  }
+
+  private static Class<?> kiddyPoolClass(Lookup lookup, Species species) {
+    var parametric = species.raw().getAnnotation(Parametric.class);
+    if (parametric == null) {
+      throw new LinkageError(species.raw() + " is not declared parametric");
+    }
+    var speciesLookup = privateSpeciesLookup(lookup, species);
+    var bsmPoolRef = parametric.value();
+    var parameters = species.parameters();
+    if (!bsmPoolRef.isEmpty()) {
       try {
-        speciesLookup = MethodHandles.privateLookupIn(sp.raw(), lookup);
-      } catch (IllegalAccessException e) {
-        throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+        var bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+        var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
+        parameters = bsm.invoke(parameters);
+      } catch (Error e) {
+        throw e;
+      } catch(Throwable e) {
+        throw (LinkageError) new LinkageError().initCause(e);
       }
+    }
+    var keySpecies = new Species(species.raw(), parameters);
+    return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies, sp -> {
       return createKiddyPoolClass(speciesLookup, sp.raw(), new ClassDataPair(sp.parameters(), null));
     });
   }
 
-  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies) throws IllegalAccessException {
-    return KIDDY_POOL_METH_CACHE.computeIfAbsent(methodSpecies, msp -> {
-      Lookup speciesLookup;
+  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) throws IllegalAccessException {
+    var mhInfo = lookup.revealDirect(method);
+    var reflected = mhInfo.reflectAs(Method.class, lookup);
+    var parametric = reflected.getAnnotation(Parametric.class);
+    if (parametric == null) {
+      throw new LinkageError(reflected + " is not declared parametric");
+    }
+    var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species);
+    var bsmPoolRef = parametric.value();
+    var parameters = methodSpecies.parameters;
+    if (!bsmPoolRef.isEmpty()) {
       try {
-        speciesLookup = MethodHandles.privateLookupIn(msp.species.raw(), lookup);
-      } catch (IllegalAccessException e) {
-        throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+        var bsmPool = speciesLookup.findStatic(methodSpecies.species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+        var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
+        parameters = bsm.invoke(parameters);
+      } catch (Error e) {
+        throw e;
+      } catch(Throwable e) {
+        throw (LinkageError) new LinkageError().initCause(e);
       }
-      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new ClassDataPair(msp.species.parameters(), msp.parameters));
+    }
+    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, parameters, methodSpecies.name, methodSpecies.descriptor);
+    return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
+      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new ClassDataPair(null, msp.parameters));
     });
   }
 
@@ -209,8 +249,8 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
-      var methodSpecies = new MethodSpecies(linkage.owner(), linkage.parameters(), name, type.toMethodDescriptorString());
-      var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies);
+      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), linkage.parameters(), name, type.toMethodDescriptorString());
+      var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
       var mh = MethodHandles.insertArguments(method, type.parameterCount(), kiddyPoolClass);
       var target = specializeStaticMethod(linkage, mh, type);
       return new ConstantCallSite(target);
@@ -239,7 +279,8 @@ public class RT {
     //System.out.println("bsm_new " + type + " " + constant + "(instance of " +constant.getClass() + ")");
 
     if (constant instanceof Linkage linkage) {
-      var init = lookup.findConstructor(type.returnType(), type.changeReturnType(void.class).appendParameterTypes(Object.class));
+      var owner = type.returnType();
+      var init = lookup.findConstructor(owner, type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
       var method = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
       var target = specializeStaticMethod(linkage, method, type);

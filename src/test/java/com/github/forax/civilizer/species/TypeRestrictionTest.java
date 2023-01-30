@@ -10,10 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class TypeRestrictionTest {
-  @Parametric
+  @Parametric("P2")
   static class Holder<T> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
+    private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
     private static final String $KP0 = "classData P1;";
     private static final String $KP1 = "list.get KP0; 0";
 
