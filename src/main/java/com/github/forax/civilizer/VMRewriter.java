@@ -205,8 +205,9 @@ public class VMRewriter {
           // constant pool description
           System.out.println("  constant pool constant " + fieldName + " value: " + value);
           var tokens = s.split(" ");
+          var action = tokens[0];
           var args = Arrays.stream(tokens).skip(1).map(this::condyArgument).toList();
-          var bsmConstants = Stream.concat(Stream.of(tokens[0]), args.stream()).toArray();
+          var bsmConstants = Stream.concat(Stream.of(action), args.stream()).toArray();
           var condyName = fieldName.substring(1);
           var condy = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
           //System.out.println("  condy: " + condy);
