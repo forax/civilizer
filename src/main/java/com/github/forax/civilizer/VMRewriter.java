@@ -379,7 +379,7 @@ public class VMRewriter {
           opcode = INVOKESTATIC;
         } else {
           slot = 1;
-          opcode = INVOKESPECIAL;  //TODO deals with instance method other than <init> here
+          opcode = name.equals("<init>") ? INVOKESPECIAL: INVOKEVIRTUAL;
           mv.visitVarInsn(ALOAD, 0);
         }
         for(var type: Type.getArgumentTypes(methodDescriptor)) {
@@ -561,6 +561,10 @@ public class VMRewriter {
             var parametricOwner = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
             var parametricCall = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(cd -> cd.methodParametricSet.contains(new Method(name, descriptor))).orElse(false);
 
+            if ((parametricOwner || parametricCall) & isInterface) {
+              throw new RewriterException("parametric call to interfaces is not supported");
+            }
+
             switch (opcode) {
               case INVOKESPECIAL -> {
                 if (parametricOwner && constantValue != null) {
@@ -590,7 +594,7 @@ public class VMRewriter {
                 }
               }
               case INVOKEVIRTUAL -> {
-                if (parametricOwner && constantValue != null) {
+                if ((parametricOwner || parametricCall) && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
@@ -604,7 +608,7 @@ public class VMRewriter {
                 }
               }
               case INVOKEINTERFACE -> {
-                // invokeintefrface is not currently supported, so do nothing
+                // calling a parametric interface is not supported, so no rewrite
               }
               default -> throw new AssertionError("invalid opcode " + opcode);
             }
