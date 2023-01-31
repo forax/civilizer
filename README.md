@@ -56,7 +56,7 @@ Each constant can be initialized with a kind of LISP that recognizes the instruc
 - `species` <class> <parameter>? creates a species,
 - `list.of` <args>... creates a list,
 - `list.get` <list> <index> extracts the nth item of a list,
-- `anchor` <arg>, extracts the argument of the parametric class/method,
+- `anchor` <ref>, returns the parameter of the parametric class/method corresponding to <ref>,
 - `linkage` <owner> <returnType> <parameterTypes...> specifies a method signature,
 - `linkaze` <owner> <parameters> <returnType> <parameterTypes...> specifyies a parametric method signature,
 - `lambda` <class> <name> <constArgs...> creates a method handle with one parameter (the constant arguments are appended after the parameter).
@@ -87,7 +87,7 @@ class SimpleList<E> {
   private static final String $P0 = "species Ljava/lang/Object;";
   private static final String $P1 = "list.of P0;";
   private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
-  private static final String $KP0 = "anchor";
+  private static final String $KP0 = "anchor P2;";
   private static final String $KP1 = "list.get KP0; 0";
   private static final String $KP2 = "linkage LSimpleList; V KP1;";
 
