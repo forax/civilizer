@@ -20,11 +20,13 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -52,6 +54,13 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
 public class VMRewriter {
   record Field(String name, String descriptor) {}
   record Method(String name, String descriptor) {}
+  enum AnchorKind {
+    ClASS, METHOD;
+
+    String text() {
+      return name().toLowerCase(Locale.ROOT);
+    }
+  }
   record ClassData(String internalName,
                    boolean parametric,
                    HashMap<String, ConstantDynamic> condyMap,
@@ -121,7 +130,11 @@ public class VMRewriter {
       false);
 
   private static ClassData analyze(byte[] buffer) {
-    var condyMap = new HashMap<String, ConstantDynamic>();
+    record ProtoCondy(String condyName, String[] tokens) {}
+
+    var anchorMap = new HashMap<String, AnchorKind>();
+    var protoCondies = new ArrayList<ProtoCondy>();
+    var condyMap = new LinkedHashMap<String, ConstantDynamic>();
     var condyFieldAccessors = new HashSet<String> ();
     var fieldRestrictionMap = new LinkedHashMap<Field,String>();
     var methodParametricSet = new HashSet<Method>();
@@ -140,16 +153,22 @@ public class VMRewriter {
         internalName = name;
       }
 
-      private AnnotationVisitor parametricAnnotationVisitor() {
+      private AnnotationVisitor parametricAnnotationVisitor(AnchorKind anchorKind) {
         return new AnnotationVisitor(ASM9) {
           @Override
           public void visit(String name, Object value) {
-            if (!name.equals("value")) {
+            if (!name.equals("value") || !(value instanceof String constant)) {
               throw new AssertionError("Parametric is malformed !");
             }
-            if (!"".equals(value)) {
+            if (!"".equals(constant)) {
+              anchorMap.merge(constant, anchorKind, (k1, k2) -> {
+                if (k1 != k2) {
+                  throw new IllegalStateException("anchor " + constant + " defined as both a class and a method anchor");
+                }
+                return k1;
+              });
               // an accessor must be generated
-              condyFieldAccessors.add("$" + value);
+              condyFieldAccessors.add("$" + constant);
             }
           }
         };
@@ -171,9 +190,55 @@ public class VMRewriter {
       public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
         if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
           parametric = true;
-          return parametricAnnotationVisitor();
+          return parametricAnnotationVisitor(AnchorKind.ClASS);
         }
         return null;
+      }
+
+      @Override
+      public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
+        if ((fieldName.startsWith("$KP") || fieldName.startsWith("$P")) && value instanceof String s) {
+          // constant pool description
+          System.out.println("  constant pool constant " + fieldName + " value: " + value);
+
+          var tokens = s.split(" ");
+          var condyName = fieldName.substring(1);
+          protoCondies.add(new ProtoCondy(condyName, tokens));
+
+          // an accessor must be generated ?
+          if (fieldName.startsWith("$KP")) {
+            condyFieldAccessors.add(fieldName);
+          }
+        }
+
+        return new FieldVisitor(ASM9) {
+          @Override
+          public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
+              return restrictionAnnotationVisitor(value -> fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), value));
+            }
+            return null;
+          }
+        };
+      }
+
+      @Override
+      public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+        return new MethodVisitor(ASM9) {
+          @Override
+          public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
+              methodParametricSet.add(new Method(methodName, methodDescriptor));
+              return parametricAnnotationVisitor(AnchorKind.METHOD);
+            }
+            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
+              return restrictionAnnotationVisitor(value -> {
+                methodRestrictionMap.put(new Method(methodName, methodDescriptor), value);
+              });
+            }
+            return null;
+          }
+        };
       }
 
       private Object condyArgument(String arg) {
@@ -199,59 +264,61 @@ public class VMRewriter {
         };
       }
 
-      @Override
-      public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
-        if ((fieldName.startsWith("$KP") || fieldName.startsWith("$P")) && value instanceof String s) {
-          // constant pool description
-          System.out.println("  constant pool constant " + fieldName + " value: " + value);
-          var tokens = s.split(" ");
+      private void populateCondyMap() {
+        for (var protoCondy : protoCondies) {
+          var condyName = protoCondy.condyName;
+          var tokens = protoCondy.tokens;
           var action = tokens[0];
-          var args = Arrays.stream(tokens).skip(1).map(this::condyArgument).toList();
+          var args = action.equals("anchor") ?
+              decodeAnchorAction(condyName, tokens) :
+              Arrays.stream(tokens).skip(1).map(this::condyArgument).toList();
           var bsmConstants = Stream.concat(Stream.of(action), args.stream()).toArray();
-          var condyName = fieldName.substring(1);
           var condy = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
-          //System.out.println("  condy: " + condy);
           condyMap.put(condyName, condy);
-          // an accessor must be generated ?
-          if (fieldName.startsWith("$KP")) {
-            condyFieldAccessors.add(fieldName);
-          }
         }
+      }
 
-        return new FieldVisitor(ASM9) {
-          @Override
-          public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
-              return restrictionAnnotationVisitor(value -> fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), value));
-            }
-            return null;
-          }
-        };
+      private List<Object> decodeAnchorAction(String condyName, String[] tokens) {
+        if (tokens.length != 2) {
+          throw new IllegalStateException("anchor has not the right number of argument " + condyName);
+        }
+        var argument = condyArgument(tokens[1]);
+        if (!(argument instanceof ConstantDynamic reference)) {
+          throw new IllegalStateException("anchor argument is not a reference to a constant " + condyName);
+        }
+        var anchorKind = anchorMap.get(reference.getName());
+        if (anchorKind == null) {
+          throw new IllegalStateException("constant " + condyName + ", anchor reference " + reference + "is not referenced by @Parametric");
+        }
+        return List.of(anchorKind.text());
       }
 
       @Override
-      public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
-        return new MethodVisitor(ASM9) {
-          @Override
-          public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
-              methodParametricSet.add(new Method(methodName, methodDescriptor));
-              return parametricAnnotationVisitor();
-            }
-            if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
-              return restrictionAnnotationVisitor(value -> {
-                methodRestrictionMap.put(new Method(methodName, methodDescriptor), value);
-              });
-            }
-            return null;
-          }
-        };
+      public void visitEnd() {
+        populateCondyMap();
       }
     };
     reader.accept(cv, 0);
 
+    /*
+    condyMap.forEach((condyName, condy) -> {
+      System.out.println("constant pool constant $" + condyName + " value: " +
+          IntStream.range(0, condy.getBootstrapMethodArgumentCount())
+              .mapToObj(condy::getBootstrapMethodArgument)
+              .map(o -> o instanceof ConstantDynamic c ? c.getName(): o.toString())
+              .collect(Collectors.joining(" ")));
+    });*/
+
     return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap);
   }
+
+
+  static class PostAnalysis {
+
+
+
+  }
+
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
     for(var path: classes) {

@@ -15,12 +15,15 @@ public class SimpleListTest {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $KP0 = "anchor";
+    private static final String $P3 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
+    private static final String $KP0 = "anchor P2;";
     private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP0;";
-    private static final String $KP3 = "linkage KP2; KP2;";
-    private static final String $KP4 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; V KP1;";
-    private static final String $KP5 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP1; I";
+    private static final String $KP2 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; V KP1;";
+    private static final String $KP3 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP1; I";
+    private static final String $KP4 = "anchor P3;";
+    private static final String $KP5 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP4;";
+    private static final String $KP6 = "linkage KP5; KP5;";
+
 
     private E[] elements;
     private int size;
@@ -37,7 +40,7 @@ public class SimpleListTest {
       return size;
     }
 
-    @TypeRestriction("KP4")
+    @TypeRestriction("KP2")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -45,15 +48,15 @@ public class SimpleListTest {
       elements[size++] = element;
     }
 
-    @TypeRestriction("KP5")
+    @TypeRestriction("KP3")
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];
     }
 
-    @Parametric("P2")
+    @Parametric("P3")
     public static <T> SimpleList<T> of() {
-      "KP3".intern();
+      "KP6".intern();
       return new SimpleList<>();
     }
   }

@@ -55,6 +55,10 @@ public class RT {
         }).toList();
   }
 
+  public static Object identity(Object parameters) {
+    return parameters;
+  }
+
 
   private static Class<?> createKiddyPoolClass(Lookup lookup, Class<?> type, Object classData) {
     var input = type.getResourceAsStream("/" + type.getName().replace('.', '/') + ".class");
@@ -99,9 +103,9 @@ public class RT {
     return kiddyPoolLookup.lookupClass();
   }
 
-  private record Anchor(Object parameter) {}
+  private record Anchor(Object classParameters, Object methodParameters) {}
 
-  private record MethodSpecies(Species species, Object parameters, String name, String descriptor) {}
+  private record MethodSpecies(Species species, Object classParameters, String name, String descriptor, Object methodParameters) {}
 
   // caches should be concurrent and maintain a weak ref on the class
   private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
@@ -116,9 +120,6 @@ public class RT {
   }
 
   private static Object callBSM(Lookup speciesLookup, Species species, String bsmPoolRef, Object parameters) {
-    if (bsmPoolRef.isEmpty()) {  // useful for debugging
-      return parameters;
-    }
     try {
       var bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
       var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
@@ -140,7 +141,7 @@ public class RT {
     var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
     var keySpecies = new Species(species.raw(), parameters);
     return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies, sp -> {
-      return createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters()));
+      return createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null));
     });
   }
 
@@ -153,10 +154,10 @@ public class RT {
     }
     var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species);
     var bsmPoolRef = parametric.value();
-    var parameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.parameters);
-    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, parameters, methodSpecies.name, methodSpecies.descriptor);
+    var methodParameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.methodParameters);
+    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, methodSpecies.classParameters, methodSpecies.name, methodSpecies.descriptor, methodParameters);
     return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
-      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.parameters));
+      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.classParameters, msp.methodParameters));
     });
   }
 
@@ -234,7 +235,7 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
-      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), linkage.parameters(), name, type.toMethodDescriptorString());
+      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), null, name, type.toMethodDescriptorString(), linkage.parameters());
       var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
       var mh = MethodHandles.insertArguments(method, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(mh);
@@ -324,7 +325,7 @@ public class RT {
   }
 
   public static CallSite bsm_method_restriction(Lookup lookup, String name, MethodType type, Object constant) {
-    System.out.println("bsm_method_restriction " + type + " " + constant);
+    //System.out.println("bsm_method_restriction " + type + " " + constant);
 
     if (constant instanceof Linkage linkage) {
       var empty = MethodHandles.empty(type);
@@ -366,7 +367,11 @@ public class RT {
     return switch (action) {
       case "anchor" -> {
         var anchor = (Anchor) MethodHandles.classData(lookup, "_", Object.class);
-        yield anchor.parameter;
+        yield switch (args[0].toString()) {
+          case "class" -> anchor.classParameters;
+          case "method" -> anchor.methodParameters;
+          default -> throw new AssertionError("unknown kind " + args[0]);
+        };
       }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);

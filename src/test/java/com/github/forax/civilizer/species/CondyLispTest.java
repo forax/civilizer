@@ -210,7 +210,7 @@ public class CondyLispTest {
     @Parametric("P0")
     class Foo<T> {
       private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
-      private static final String $KP0 = "anchor";
+      private static final String $KP0 = "anchor P0;";
 
       Object value() {
         "KP0".intern();
@@ -225,7 +225,7 @@ public class CondyLispTest {
   @Parametric("P0")
   record Data<T>() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
-    private static final String $KP0 = "anchor";
+    private static final String $KP0 = "anchor P0;";
 
     Object value() {
       "KP0".intern();
@@ -254,10 +254,10 @@ public class CondyLispTest {
   }
 
 
-  @Parametric("")
+  @Parametric("P0")
   record Data3<T>() {
-    private static final String $P0 = "list.of Ljava/lang/Object;";
-    private static final String $KP0 = "anchor";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; \"identity\" (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $KP0 = "anchor P0;";
 
     Object value() {
       "KP0".intern();
@@ -287,21 +287,21 @@ public class CondyLispTest {
   }
 
 
-  @Parametric("")
   class MethodData {
-    private static final String $KP0 = "anchor";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; \"identity\" (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $KP0 = "anchor P0;";
 
-    @Parametric("")
+    @Parametric("P0")
     static Object value() {
       "KP0".intern();
       return RT.ldc();
     }
 
-    private static final String $P0 = "species Lcom/github/forax/civilizer/species/CondyLispTest$MethodData;";
-    private static final String $P1 = "linkaze P0; 42 Ljava/lang/Object;";
+    private static final String $P1 = "species Lcom/github/forax/civilizer/species/CondyLispTest$MethodData;";
+    private static final String $P2 = "linkaze P1; 42 Ljava/lang/Object;";
 
     static void test() {
-      "P1".intern();
+      "P2".intern();
       var value = MethodData.value();
 
       assertEquals(42, value);
