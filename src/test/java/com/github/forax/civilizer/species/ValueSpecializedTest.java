@@ -20,7 +20,7 @@ public class ValueSpecializedTest {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $KP0 = "classData";
+    private static final String $KP0 = "anchor";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; V KP1;";
     private static final String $KP3 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; KP1; I";
@@ -111,7 +111,7 @@ public class ValueSpecializedTest {
   @Parametric("")
   record MethodData() {
     private static final String $P0 = "list.of Ljava/lang/Object;";
-    private static final String $KP0 = "methodData";
+    private static final String $KP0 = "anchor";
     private static final String $KP1 = "list.get KP0; 0";
 
     @Parametric("")

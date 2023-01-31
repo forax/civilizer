@@ -99,7 +99,8 @@ public class RT {
     return kiddyPoolLookup.lookupClass();
   }
 
-  private record ClassDataPair(Object speciesParameters, Object methodParameters) {}
+  private record Anchor(Object parameter) {}
+
   private record MethodSpecies(Species species, Object parameters, String name, String descriptor) {}
 
   // caches should be concurrent and maintain a weak ref on the class
@@ -139,7 +140,7 @@ public class RT {
     var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
     var keySpecies = new Species(species.raw(), parameters);
     return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies, sp -> {
-      return createKiddyPoolClass(speciesLookup, sp.raw(), new ClassDataPair(sp.parameters(), null));
+      return createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters()));
     });
   }
 
@@ -155,7 +156,7 @@ public class RT {
     var parameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.parameters);
     var keyMethodSpecies = new MethodSpecies(methodSpecies.species, parameters, methodSpecies.name, methodSpecies.descriptor);
     return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
-      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new ClassDataPair(null, msp.parameters));
+      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.parameters));
     });
   }
 
@@ -363,13 +364,9 @@ public class RT {
     //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
     return switch (action) {
-      case "classData" -> {
-        var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        yield classDataPair.speciesParameters;
-      }
-      case "methodData" -> {
-        var classDataPair = (ClassDataPair) MethodHandles.classData(lookup, "_", Object.class);
-        yield classDataPair.methodParameters;
+      case "anchor" -> {
+        var anchor = (Anchor) MethodHandles.classData(lookup, "_", Object.class);
+        yield anchor.parameter;
       }
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);

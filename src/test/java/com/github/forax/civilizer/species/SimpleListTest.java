@@ -15,7 +15,7 @@ public class SimpleListTest {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $KP0 = "classData";
+    private static final String $KP0 = "anchor";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP0;";
     private static final String $KP3 = "linkage KP2; KP2;";
