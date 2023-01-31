@@ -589,7 +589,7 @@ public class VMRewriter {
                   return;
                 }
               }
-              case INVOKEVIRTUAL, INVOKEINTERFACE -> {
+              case INVOKEVIRTUAL -> {
                 if (parametricOwner && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
@@ -602,6 +602,9 @@ public class VMRewriter {
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_VIRTUAL, constant);
                   return;
                 }
+              }
+              case INVOKEINTERFACE -> {
+                // invokeintefrface is not currently supported, so do nothing
               }
               default -> throw new AssertionError("invalid opcode " + opcode);
             }
