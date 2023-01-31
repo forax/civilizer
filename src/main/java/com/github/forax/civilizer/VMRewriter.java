@@ -77,6 +77,17 @@ public class VMRewriter {
     }
   }
 
+  private static final class RewriterException extends RuntimeException {
+    public RewriterException(String message) {
+      super(message);
+    }
+    public RewriterException(String message, Throwable cause) {
+      super(message, cause);
+    }
+    public RewriterException(Throwable cause) {
+      super(cause);
+    }
+  }
 
   private static final String RT_INTERNAL = RT.class.getName().replace('.', '/');
   private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
@@ -163,7 +174,7 @@ public class VMRewriter {
             if (!"".equals(constant)) {
               anchorMap.merge(constant, anchorKind, (k1, k2) -> {
                 if (k1 != k2) {
-                  throw new IllegalStateException("anchor " + constant + " defined as both a class and a method anchor");
+                  throw new RewriterException("anchor " + constant + " defined as both a class and a method anchor");
                 }
                 return k1;
               });
@@ -249,7 +260,7 @@ public class VMRewriter {
           case 'K', 'P' -> {
             var condy = condyMap.get(arg.substring(0, arg.length() - 1));
             if (condy == null) {
-              throw new IllegalStateException("undefined condy " + arg);
+              throw new RewriterException("undefined condy " + arg);
             }
             yield condy;
           }
@@ -280,15 +291,15 @@ public class VMRewriter {
 
       private List<Object> decodeAnchorAction(String condyName, String[] tokens) {
         if (tokens.length != 2) {
-          throw new IllegalStateException("anchor has not the right number of argument " + condyName);
+          throw new RewriterException("anchor has not the right number of argument " + condyName);
         }
         var argument = condyArgument(tokens[1]);
         if (!(argument instanceof ConstantDynamic reference)) {
-          throw new IllegalStateException("anchor argument is not a reference to a constant " + condyName);
+          throw new RewriterException("anchor argument is not a reference to a constant " + condyName);
         }
         var anchorKind = anchorMap.get(reference.getName());
         if (anchorKind == null) {
-          throw new IllegalStateException("constant " + condyName + ", anchor reference " + reference + "is not referenced by @Parametric");
+          throw new RewriterException("constant " + condyName + ", anchor reference " + reference + "is not referenced by @Parametric");
         }
         return List.of(anchorKind.text());
       }
@@ -385,7 +396,7 @@ public class VMRewriter {
       private ConstantDynamic findCondy(String ldcConstant) {
         var condy =  classData.condyMap.get(ldcConstant);
         if (condy == null) {
-          throw new IllegalStateException("unknown constant pool constant '" + ldcConstant + "'");
+          throw new RewriterException("unknown constant pool constant '" + ldcConstant + "'");
         }
         return condy;
       }
@@ -535,7 +546,7 @@ public class VMRewriter {
             if (owner.equals(RT_INTERNAL) && name.equals("ldc") && descriptor.equals("()Ljava/lang/Object;")) {
               var constant = constantValue;
               if (constant == null) {
-                throw new IllegalStateException("no constant info for ldc");
+                throw new RewriterException("no constant info for ldc");
               }
               constantValue = null;
               if (constant instanceof ConstantDynamic condy) {
@@ -646,7 +657,7 @@ public class VMRewriter {
           @Override
           public void visitEnd() {
             if (constantValue != null) {
-              throw new IllegalStateException("in method " + internalName + "." + methodName + methodDescriptor + ", unbounded constant value " + constantValue);
+              throw new RewriterException("in method " + internalName + "." + methodName + methodDescriptor + ", unbounded constant value " + constantValue);
             }
             super.visitEnd();
           }
