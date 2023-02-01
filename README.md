@@ -146,11 +146,12 @@ The values of the type arguments inside the constant pools are computed once whe
 for the VM, a reference to a `$KP` is a constant once JITed (the implementation uses an inlining cache per operation on `$KP`).
 This should ensure proper performance, at the expense of the constant pool being quite bloated.
 
-Parametric class instantiation works, parametric method instantiation work, array specialization works,
-use site method specialization works, raw types are supported (using the bsm referenced by the annotation `Parametric`).
+Parametric class instantiation works, static and instance parametric methods instantiation works,
+array specialization works, use site method specialization works,
+raw types are supported (using the bsm referenced by the annotation `Parametric`).
 Type restriction (with `@TypeRestriction`) on fields and methods are implemented (specialization of fields is not implemented).
 
-Inheritance of generic classes and interface default methods are not supported.
+Inheritance of generic classes, interfaces and default methods are not supported (yet !).
 
 
 ## How to build it
