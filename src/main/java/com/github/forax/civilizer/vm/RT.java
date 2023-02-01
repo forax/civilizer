@@ -161,7 +161,7 @@ public class RT {
     });
   }
 
-  private static final class KiddyPoolInliningCache extends MutableCallSite {
+  private static final class KiddyPoolRefInliningCache extends MutableCallSite {
     @FunctionalInterface
     private interface BSM {
       CallSite apply(Object value) throws Throwable;
@@ -171,8 +171,8 @@ public class RT {
     static {
       var lookup = MethodHandles.lookup();
       try {
-        SLOW_PATH = lookup.findVirtual(KiddyPoolInliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
-        POINTER_CHECK = lookup.findStatic(KiddyPoolInliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
+        SLOW_PATH = lookup.findVirtual(KiddyPoolRefInliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
+        POINTER_CHECK = lookup.findStatic(KiddyPoolRefInliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new AssertionError(e);
       }
@@ -182,7 +182,7 @@ public class RT {
     private final BSM bsm;
     private final String kiddyPoolRef;
 
-    private KiddyPoolInliningCache(MethodType type, Lookup lookup, String kiddyPoolRef, BSM bsm) {
+    private KiddyPoolRefInliningCache(MethodType type, Lookup lookup, String kiddyPoolRef, BSM bsm) {
       super(type);
       this.lookup = lookup;
       this.kiddyPoolRef = kiddyPoolRef;
@@ -203,7 +203,7 @@ public class RT {
       target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
 
       var test = MethodHandles.dropArguments(POINTER_CHECK.bindTo(kiddyPool),0, type().parameterList().subList(0, type().parameterCount() - 1));
-      var guard = MethodHandles.guardWithTest(test, target, new KiddyPoolInliningCache(type(), lookup, kiddyPoolRef, bsm).dynamicInvoker());
+      var guard = MethodHandles.guardWithTest(test, target, new KiddyPoolRefInliningCache(type(), lookup, kiddyPoolRef, bsm).dynamicInvoker());
       setTarget(guard);
 
       return target;
@@ -258,7 +258,7 @@ public class RT {
   public static CallSite bsm_ldc(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_ldc " + constant + " (instance of " + constant.getClass() + ")");
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_ldc(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
     return new ConstantCallSite(MethodHandles.constant(Object.class, constant));
@@ -275,7 +275,7 @@ public class RT {
       return new ConstantCallSite(mh);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_static(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), owner, value));
     }
 
@@ -293,7 +293,7 @@ public class RT {
       return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_virtual(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
@@ -311,7 +311,7 @@ public class RT {
       return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_new(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
@@ -327,7 +327,7 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_new_array(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
@@ -342,7 +342,7 @@ public class RT {
       return new ConstantCallSite(MethodHandles.constant(type.returnType(), defaultValue));
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_init_default(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
@@ -358,7 +358,7 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_put_value(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
@@ -374,7 +374,7 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_method_restriction(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
