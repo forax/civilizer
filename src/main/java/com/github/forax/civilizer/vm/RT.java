@@ -161,27 +161,32 @@ public class RT {
     });
   }
 
-  private static class InliningCache extends MutableCallSite {
+  private static final class KiddyPoolInliningCache extends MutableCallSite {
+    @FunctionalInterface
+    private interface BSM {
+      CallSite apply(Object value) throws Throwable;
+    }
+
     private static final MethodHandle SLOW_PATH, POINTER_CHECK;
     static {
       var lookup = MethodHandles.lookup();
       try {
-        SLOW_PATH = lookup.findVirtual(InliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
-        POINTER_CHECK = lookup.findStatic(InliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
+        SLOW_PATH = lookup.findVirtual(KiddyPoolInliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
+        POINTER_CHECK = lookup.findStatic(KiddyPoolInliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new AssertionError(e);
       }
     }
 
     private final Lookup lookup;
-    private final MethodHandle bsm;
+    private final BSM bsm;
     private final String kiddyPoolRef;
 
-    private InliningCache(MethodType type, Lookup lookup, MethodHandle bsm, String kiddyPoolRef) {
+    private KiddyPoolInliningCache(MethodType type, Lookup lookup, String kiddyPoolRef, BSM bsm) {
       super(type);
       this.lookup = lookup;
-      this.bsm = bsm;
       this.kiddyPoolRef = kiddyPoolRef;
+      this.bsm = bsm;
       var combiner = MethodHandles.dropArguments(SLOW_PATH.bindTo(this), 0, type.parameterList().subList(0, type.parameterCount() - 1));
       setTarget(MethodHandles.foldArguments(MethodHandles.exactInvoker(type), combiner));
     }
@@ -194,39 +199,67 @@ public class RT {
       var accessor = lookup.findStatic((Class<?>) kiddyPool, "$" + kiddyPoolRef, methodType(Object.class));
       var value = accessor.invokeExact();
 
-      var target = ((CallSite) bsm.invoke(value)).dynamicInvoker();
+      var target = bsm.apply(value).dynamicInvoker();
       target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
 
       var test = MethodHandles.dropArguments(POINTER_CHECK.bindTo(kiddyPool),0, type().parameterList().subList(0, type().parameterCount() - 1));
-      var guard = MethodHandles.guardWithTest(test, target, new InliningCache(type(), lookup, bsm, kiddyPoolRef).dynamicInvoker());
+      var guard = MethodHandles.guardWithTest(test, target, new KiddyPoolInliningCache(type(), lookup, kiddyPoolRef, bsm).dynamicInvoker());
       setTarget(guard);
 
       return target;
     }
   }
 
-  private static final MethodHandle BSM_LDC, BSM_STATIC, BSM_VIRTUAL, BSM_NEW, BSM_NEW_ARRAY, BSM_INIT_DEFAULT, BSM_PUT_VALUE, BSM_METHOD_RESTRICTION;
-  static {
-    var lookup = MethodHandles.lookup();
-    try {
-      BSM_LDC = lookup.findStatic(RT.class, "bsm_ldc", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_STATIC = lookup.findStatic(RT.class, "bsm_static", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Class.class, Object.class));
-      BSM_VIRTUAL = lookup.findStatic(RT.class, "bsm_virtual", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_NEW = lookup.findStatic(RT.class, "bsm_new", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_NEW_ARRAY = lookup.findStatic(RT.class, "bsm_new_array", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_INIT_DEFAULT = lookup.findStatic(RT.class, "bsm_init_default", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_PUT_VALUE = lookup.findStatic(RT.class, "bsm_put_value", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-      BSM_METHOD_RESTRICTION = lookup.findStatic(RT.class, "bsm_method_restriction", methodType(CallSite.class, Lookup.class, String.class, MethodType.class, Object.class));
-    } catch (NoSuchMethodException | IllegalAccessException e) {
-      throw new AssertionError(e);
+  /*private static final class VirtualCallInliningCache extends MutableCallSite {
+    @FunctionalInterface
+    private interface BSM {
+      CallSite apply(Class<?> receiverClass) throws Throwable;
     }
-  }
+
+    private static final MethodHandle SLOW_PATH, CLASS_CHECK;
+    static {
+      var lookup = MethodHandles.lookup();
+      try {
+        SLOW_PATH = lookup.findVirtual(VirtualCallInliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
+        CLASS_CHECK = lookup.findStatic(VirtualCallInliningCache.class, "classCheck", methodType(boolean.class, Class.class, Object.class));
+      } catch (NoSuchMethodException | IllegalAccessException e) {
+        throw new AssertionError(e);
+      }
+    }
+
+    private final Lookup lookup;
+    private final BSM bsm;
+
+    private VirtualCallInliningCache(MethodType type, Lookup lookup, BSM bsm) {
+      super(type);
+      this.lookup = lookup;
+      this.bsm = bsm;
+      var combiner = SLOW_PATH.bindTo(this);
+      setTarget(MethodHandles.foldArguments(MethodHandles.exactInvoker(type), combiner));
+    }
+
+    private static boolean classCheck(Class<?> clazz, Object o) {
+      return o.getClass() == clazz;
+    }
+
+    private MethodHandle slowPath(Object receiver) throws Throwable {
+      Class<?> receiverClass = receiver.getClass();
+      var target = bsm.apply(receiverClass).dynamicInvoker();
+      target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
+
+      var test = CLASS_CHECK.bindTo(receiverClass);
+      var guard = MethodHandles.guardWithTest(test, target, new VirtualCallInliningCache(type(), lookup, bsm).dynamicInvoker());
+      setTarget(guard);
+
+      return target;
+    }
+  }*/
 
   public static CallSite bsm_ldc(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_ldc " + constant + " (instance of " + constant.getClass() + ")");
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_LDC, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_ldc(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
     return new ConstantCallSite(MethodHandles.constant(Object.class, constant));
   }
@@ -242,8 +275,8 @@ public class RT {
       return new ConstantCallSite(mh);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_STATIC, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_static(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), owner, value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + owner + " " + constant);
@@ -260,8 +293,8 @@ public class RT {
       return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_VIRTUAL, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_virtual(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
@@ -278,8 +311,8 @@ public class RT {
       return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_NEW, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_new(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type + " " + constant);
@@ -294,8 +327,8 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_NEW_ARRAY, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_new_array(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
@@ -309,8 +342,8 @@ public class RT {
       return new ConstantCallSite(MethodHandles.constant(type.returnType(), defaultValue));
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_INIT_DEFAULT, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_init_default(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
@@ -325,8 +358,8 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_PUT_VALUE, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_put_value(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
@@ -341,8 +374,8 @@ public class RT {
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
-      var bsm = MethodHandles.insertArguments(BSM_METHOD_RESTRICTION, 0, lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()));
-      return new InliningCache(type, lookup, bsm, kiddyPoolRef);
+      return new KiddyPoolInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_method_restriction(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
