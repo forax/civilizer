@@ -23,6 +23,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static java.lang.invoke.MethodHandles.dropArguments;
+import static java.lang.invoke.MethodHandles.exactInvoker;
+import static java.lang.invoke.MethodHandles.filterArguments;
+import static java.lang.invoke.MethodHandles.foldArguments;
+import static java.lang.invoke.MethodHandles.guardWithTest;
+import static java.lang.invoke.MethodHandles.insertArguments;
+import static java.lang.invoke.MethodHandles.permuteArguments;
 import static java.lang.invoke.MethodType.methodType;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -86,7 +93,7 @@ public class RT {
 
       @Override
       public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_SYNTHETIC) != 0 && name.startsWith("$KP")) {
+        if ((access & ACC_SYNTHETIC) != 0 && (name.startsWith("$KP") || name.equals("$classData"))) {
           return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
         return null;
@@ -105,15 +112,15 @@ public class RT {
 
   private record Anchor(Object classParameters, Object methodParameters) {}
 
-  private record MethodSpecies(Species species, Object classParameters, String name, String descriptor, Object methodParameters) {}
+  private record MethodSpecies(Species species, String name, String descriptor, Object methodParameters) {}
 
   // caches should be concurrent and maintain a weak ref on the class
   private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
   private static final HashMap<MethodSpecies, Class<?>> KIDDY_POOL_METH_CACHE = new HashMap<>();
 
-  private static Lookup privateSpeciesLookup(Lookup lookup, Species species) {
+  private static Lookup privateSpeciesLookup(Lookup lookup, Class<?> raw) {
     try {
-       return MethodHandles.privateLookupIn(species.raw(), lookup);
+       return MethodHandles.privateLookupIn(raw, lookup);
     } catch (IllegalAccessException e) {
       throw (IllegalAccessError) new IllegalAccessError().initCause(e);
     }
@@ -136,7 +143,7 @@ public class RT {
     if (parametric == null) {
       throw new LinkageError(species.raw() + " is not declared parametric");
     }
-    var speciesLookup = privateSpeciesLookup(lookup, species);
+    var speciesLookup = privateSpeciesLookup(lookup, species.raw());
     var bsmPoolRef = parametric.value();
     var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
     var keySpecies = new Species(species.raw(), parameters);
@@ -152,12 +159,12 @@ public class RT {
     if (parametric == null) {
       throw new LinkageError(reflected + " is not declared parametric");
     }
-    var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species);
+    var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species.raw());
     var bsmPoolRef = parametric.value();
     var methodParameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.methodParameters);
-    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, methodSpecies.classParameters, methodSpecies.name, methodSpecies.descriptor, methodParameters);
+    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, methodSpecies.name, methodSpecies.descriptor, methodParameters);
     return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
-      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.classParameters, msp.methodParameters));
+      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.species.parameters(), msp.methodParameters));
     });
   }
 
@@ -187,8 +194,8 @@ public class RT {
       this.lookup = lookup;
       this.kiddyPoolRef = kiddyPoolRef;
       this.bsm = bsm;
-      var combiner = MethodHandles.dropArguments(SLOW_PATH.bindTo(this), 0, type.parameterList().subList(0, type.parameterCount() - 1));
-      setTarget(MethodHandles.foldArguments(MethodHandles.exactInvoker(type), combiner));
+      var combiner = dropArguments(SLOW_PATH.bindTo(this), 0, type.parameterList().subList(0, type.parameterCount() - 1));
+      setTarget(foldArguments(exactInvoker(type), combiner));
     }
 
     private static boolean pointerCheck(Object o, Object o2) {
@@ -200,17 +207,17 @@ public class RT {
       var value = accessor.invokeExact();
 
       var target = bsm.apply(value).dynamicInvoker();
-      target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
+      target = dropArguments(target, type().parameterCount() - 1, Object.class);
 
-      var test = MethodHandles.dropArguments(POINTER_CHECK.bindTo(kiddyPool),0, type().parameterList().subList(0, type().parameterCount() - 1));
-      var guard = MethodHandles.guardWithTest(test, target, new KiddyPoolRefInliningCache(type(), lookup, kiddyPoolRef, bsm).dynamicInvoker());
+      var test = dropArguments(POINTER_CHECK.bindTo(kiddyPool),0, type().parameterList().subList(0, type().parameterCount() - 1));
+      var guard = guardWithTest(test, target, new KiddyPoolRefInliningCache(type(), lookup, kiddyPoolRef, bsm).dynamicInvoker());
       setTarget(guard);
 
       return target;
     }
   }
 
-  /*private static final class VirtualCallInliningCache extends MutableCallSite {
+  private static final class VirtualCallInliningCache extends MutableCallSite {
     @FunctionalInterface
     private interface BSM {
       CallSite apply(Class<?> receiverClass) throws Throwable;
@@ -235,7 +242,7 @@ public class RT {
       this.lookup = lookup;
       this.bsm = bsm;
       var combiner = SLOW_PATH.bindTo(this);
-      setTarget(MethodHandles.foldArguments(MethodHandles.exactInvoker(type), combiner));
+      setTarget(foldArguments(exactInvoker(type), combiner.asType(methodType(MethodHandle.class, type.parameterType(0)))));
     }
 
     private static boolean classCheck(Class<?> clazz, Object o) {
@@ -243,17 +250,16 @@ public class RT {
     }
 
     private MethodHandle slowPath(Object receiver) throws Throwable {
-      Class<?> receiverClass = receiver.getClass();
+      var receiverClass = receiver.getClass();
       var target = bsm.apply(receiverClass).dynamicInvoker();
-      target = MethodHandles.dropArguments(target, type().parameterCount() - 1, Object.class);
 
-      var test = CLASS_CHECK.bindTo(receiverClass);
-      var guard = MethodHandles.guardWithTest(test, target, new VirtualCallInliningCache(type(), lookup, bsm).dynamicInvoker());
+      var test = CLASS_CHECK.bindTo(receiverClass).asType(methodType(boolean.class, type().parameterType(0)));
+      var guard = guardWithTest(test, target, new VirtualCallInliningCache(type(), lookup, bsm).dynamicInvoker());
       setTarget(guard);
 
       return target;
     }
-  }*/
+  }
 
   public static CallSite bsm_ldc(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_ldc " + constant + " (instance of " + constant.getClass() + ")");
@@ -269,9 +275,9 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
-      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), null, name, type.toMethodDescriptorString(), linkage.parameters());
+      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), name, type.toMethodDescriptorString(), linkage.parameters());
       var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
-      var mh = MethodHandles.insertArguments(method, type.parameterCount(), kiddyPoolClass);
+      var mh = insertArguments(method, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(mh);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -286,9 +292,47 @@ public class RT {
     //System.out.println("bsm_virtual " + name + type + " " + constant);
 
     if (constant instanceof Linkage linkage) {
+      // the instance method is parametrized ?
       if (linkage.parameters() != null) {
-        throw new LinkageError("not yet supported !");
+        // an inlining cache for the receiver
+        return new VirtualCallInliningCache(type, lookup,
+            receiverClass -> {
+              var parametric = receiverClass.isAnnotationPresent(Parametric.class);
+              var speciesLookup = privateSpeciesLookup(lookup, receiverClass);
+              if (parametric) {
+                // an inlining cache for the kiddyPool "classData" constant pool ref
+                var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, "classData",
+                    classData -> {
+                      var anchor = (Anchor) classData;
+                      var parameters = anchor.classParameters;
+
+                      // call the de-virtualized method with a kiddy pool created with the pair (species parameter + method parameter)
+                      var species = new Species(receiverClass, parameters);
+                      var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
+                      var methodSpecies = new MethodSpecies(species, name, type.toMethodDescriptorString(), linkage.parameters());
+                      var kiddyPoolClass = kiddyPoolClass(speciesLookup, methodSpecies, method);
+                      var target = insertArguments(method, type.parameterCount(), kiddyPoolClass);
+                      return new ConstantCallSite(target);
+                    });
+
+                // access to the kiddy pool of the receiver
+                var kiddyPoolGetter = speciesLookup.findGetter(receiverClass, "$kiddyPool", Object.class);
+                var mh = filterArguments(inliningCache.dynamicInvoker(), type.parameterCount(), kiddyPoolGetter);
+                var reorder = IntStream.concat(IntStream.range(0, type.parameterCount()), IntStream.of(0)).toArray();
+                var target = permuteArguments(mh, type, reorder);
+                return new ConstantCallSite(target);
+              }
+
+              // call the de-virtualized method with a kiddy pool created with no species parameters (only a method parameters)
+              var species = new Species(receiverClass, null);
+              var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
+              var methodSpecies = new MethodSpecies(species, name, type.toMethodDescriptorString(), linkage.parameters());
+              var kiddyPoolClass = kiddyPoolClass(speciesLookup, methodSpecies, method);
+              var target = insertArguments(method, type.parameterCount(), kiddyPoolClass);
+              return new ConstantCallSite(target);
+            });
       }
+
       var method = lookup.findVirtual(type.parameterType(0), name, type.dropParameterTypes(0, 1));
       return new ConstantCallSite(method);
     }
@@ -307,7 +351,7 @@ public class RT {
       var owner = type.returnType();
       var init = lookup.findConstructor(owner, type.changeReturnType(void.class).appendParameterTypes(Object.class));
       var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
-      var method = MethodHandles.insertArguments(init, type.parameterCount(), kiddyPoolClass);
+      var method = insertArguments(init, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(method);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -420,7 +464,7 @@ public class RT {
       case "linkage" -> new Linkage(asSpecies(args[0]), null, asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
       case "linkaze" -> new Linkage(asSpecies(args[0]), args[1], asSpecies(args[2]), Arrays.stream(args).skip(3).map(RT::asSpecies).toList());
       case "mh" -> {
-        yield MethodHandles.insertArguments(
+        yield insertArguments(
             lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
             1, Arrays.stream(args).skip(3).toArray());
       }

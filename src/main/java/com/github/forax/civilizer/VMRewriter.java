@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,6 +56,7 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
 public class VMRewriter {
   record Field(String name, String descriptor) {}
   record Method(String name, String descriptor) {}
+  record FieldRestriction(int access, String constant) {}
   enum AnchorKind {
     ClASS, METHOD;
 
@@ -65,7 +68,7 @@ public class VMRewriter {
                    boolean parametric,
                    HashMap<String, ConstantDynamic> condyMap,
                    HashSet<String> condyFieldAccessors,
-                   LinkedHashMap<Field,String> fieldRestrictionMap,
+                   LinkedHashMap<Field,FieldRestriction> fieldRestrictionMap,
                    HashSet<Method> methodParametricSet,
                    HashMap<Method, String> methodRestrictionMap) {}
   record Analysis(HashMap<String,ClassData> classDataMap) {
@@ -131,6 +134,10 @@ public class VMRewriter {
       "bsm_raw_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_CLASS_DATA = new Handle(H_INVOKESTATIC, MethodHandles.class.getName().replace('.', '/'),
+      "classData",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+      false);
   private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_type",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
@@ -147,7 +154,7 @@ public class VMRewriter {
     var protoCondies = new ArrayList<ProtoCondy>();
     var condyMap = new LinkedHashMap<String, ConstantDynamic>();
     var condyFieldAccessors = new HashSet<String> ();
-    var fieldRestrictionMap = new LinkedHashMap<Field,String>();
+    var fieldRestrictionMap = new LinkedHashMap<Field,FieldRestriction>();
     var methodParametricSet = new HashSet<Method>();
     var methodRestrictionMap = new HashMap<Method, String>();
 
@@ -226,7 +233,7 @@ public class VMRewriter {
           @Override
           public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
             if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
-              return restrictionAnnotationVisitor(value -> fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), value));
+              return restrictionAnnotationVisitor(value -> fieldRestrictionMap.put(new Field(fieldName, fieldDescriptor), new FieldRestriction(access, value)));
             }
             return null;
           }
@@ -311,25 +318,8 @@ public class VMRewriter {
     };
     reader.accept(cv, 0);
 
-    /*
-    condyMap.forEach((condyName, condy) -> {
-      System.out.println("constant pool constant $" + condyName + " value: " +
-          IntStream.range(0, condy.getBootstrapMethodArgumentCount())
-              .mapToObj(condy::getBootstrapMethodArgument)
-              .map(o -> o instanceof ConstantDynamic c ? c.getName(): o.toString())
-              .collect(Collectors.joining(" ")));
-    });*/
-
     return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap);
   }
-
-
-  static class PostAnalysis {
-
-
-
-  }
-
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
     for(var path: classes) {
@@ -423,8 +413,12 @@ public class VMRewriter {
 
                 // init defaults
                 for(var fieldEntry: classData.fieldRestrictionMap.entrySet()) {
+                  var fieldRestriction = fieldEntry.getValue();
+                  if ((fieldRestriction.access & ACC_FINAL) != 0) {
+                    continue;  // no need to initialize final field
+                  }
                   var field = fieldEntry.getKey();
-                  var constant = fieldEntry.getValue();
+                  var constant = fieldRestriction.constant;
                   mv.visitVarInsn(ALOAD, 0);
                   var condy = findCondy(constant);
                   var constantValue = constant.startsWith("P") ? condy : constant;
@@ -516,8 +510,9 @@ public class VMRewriter {
           public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
             var classData = classDataMap.get(owner);
             if (opcode == PUTFIELD && classData != null && classData.parametric) {
-              var constant = classData.fieldRestrictionMap.get(new Field(name, descriptor));
-              if (constant != null) {
+              var fieldRestriction = classData.fieldRestrictionMap.get(new Field(name, descriptor));
+              if (fieldRestriction != null) {
+                var constant = fieldRestriction.constant;
                 var condy = findCondy(constant);
                 var constantValue = constant.startsWith("P") ? condy : constant;
                 var desc = MethodTypeDesc.of(ConstantDescs.CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
@@ -676,6 +671,14 @@ public class VMRewriter {
         if (classData.parametric) {  // parametric class
           var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
           fv.visitEnd();
+        }
+        if (!classData.methodParametricSet.isEmpty()) {  // at least one parametric method
+          var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, "$classData", "()Ljava/lang/Object;", null, null);
+          mv.visitCode();
+          mv.visitLdcInsn(new ConstantDynamic("_", "Ljava/lang/Object;", BSM_CLASS_DATA));
+          mv.visitInsn(ARETURN);
+          mv.visitMaxs(1, 0);
+          mv.visitEnd();
         }
         super.visitEnd();
       }
