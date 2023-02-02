@@ -412,9 +412,9 @@ public class RT {
   public static CallSite bsm_method_restriction(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_method_restriction " + type + " " + constant);
 
-    if (constant instanceof Linkage linkage) {
+    if (constant instanceof Restriction restriction) {
       var empty = MethodHandles.empty(type);
-      var target = empty.asType(linkage.toMethodType()).asType(type);
+      var target = empty.asType(methodType(type.returnType(), restriction.restrictions())).asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -446,6 +446,16 @@ public class RT {
     throw new IllegalStateException("object " + o + " is not a species or a class");
   }
 
+  private static Class<?> asClass(Object o) {
+    if (o instanceof Class<?> clazz) {
+      return clazz;
+    }
+    if (o instanceof Species species) {
+      return species.raw();
+    }
+    throw new IllegalStateException("object " + o + " is not a species or a class");
+  }
+
   public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
     //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
@@ -468,6 +478,7 @@ public class RT {
             lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
             1, Arrays.stream(args).skip(3).toArray());
       }
+      case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(RT::asClass).toList());
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }

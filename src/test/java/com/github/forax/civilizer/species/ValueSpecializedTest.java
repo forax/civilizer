@@ -22,8 +22,7 @@ public class ValueSpecializedTest {
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
     private static final String $KP0 = "anchor P2;";
     private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; V KP1;";
-    private static final String $KP3 = "linkage Lcom/github/forax/civilizer/species/ValueSpecializedTest$SimpleList; KP1; I";
+    private static final String $KP2 = "restriction KP1;";
 
     private E[] elements;
     private int size;
@@ -48,7 +47,6 @@ public class ValueSpecializedTest {
       elements[size++] = element;
     }
 
-    @TypeRestriction("KP3")
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];

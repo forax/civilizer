@@ -18,8 +18,7 @@ public class SimpleListTest {
     private static final String $P3 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
     private static final String $KP0 = "anchor P2;";
     private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; V KP1;";
-    private static final String $KP3 = "linkage Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP1; I";
+    private static final String $KP2 = "restriction KP1;";
     private static final String $KP4 = "anchor P3;";
     private static final String $KP5 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP4;";
     private static final String $KP6 = "linkage KP5; KP5;";
@@ -48,7 +47,6 @@ public class SimpleListTest {
       elements[size++] = element;
     }
 
-    @TypeRestriction("KP3")
     public E get(int index) {
       Objects.checkIndex(index, size);
       return elements[index];
