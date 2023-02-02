@@ -17,8 +17,9 @@ public class TypeRestrictionTest {
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
     private static final String $KP0 = "anchor P2;";
     private static final String $KP1 = "list.get KP0; 0";
+    private static final String $KP2 = "restriction KP1;";
 
-    @TypeRestriction("KP1")
+    @TypeRestriction("KP2")
     private T t;
 
     Holder() { }

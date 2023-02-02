@@ -3,14 +3,14 @@ package com.github.forax.civilizer.vm;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public record Restriction(List<Class<?>> restrictions) {
+public record Restriction(List<Class<?>> types) {
   public Restriction {
-    restrictions = List.copyOf(restrictions);
+    types = List.copyOf(types);
   }
 
   @Override
   public String toString() {
-    return restrictions.stream()
+    return types.stream()
         .map(Class::getSimpleName)
         .collect(Collectors.joining(" ", "Restriction ", ""));
   }

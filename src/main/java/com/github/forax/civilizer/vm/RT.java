@@ -381,8 +381,12 @@ public class RT {
   public static CallSite bsm_init_default(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_init_default " + type + " " + constant);
 
-    if (constant instanceof Species species) {
-      var defaultValue = Array.get(Array.newInstance(species.raw(), 1), 0);
+    if (constant instanceof Restriction restriction) {
+      var restrictionTypes = restriction.types();
+      if (restrictionTypes.size() != 1) {
+        throw new LinkageError(restriction + " has too many types, only one is required");
+      }
+      var defaultValue = Array.get(Array.newInstance(restrictionTypes.get(0), 1), 0);
       return new ConstantCallSite(MethodHandles.constant(type.returnType(), defaultValue));
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -396,9 +400,13 @@ public class RT {
   public static CallSite bsm_put_value(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchFieldException, IllegalAccessException {
     //System.out.println("bsm_put_value_check " + type + " " + constant);
 
-    if (constant instanceof Species species) {
+    if (constant instanceof Restriction restriction) {
+      var restrictionTypes = restriction.types();
+      if (restrictionTypes.size() != 1) {
+        throw new LinkageError(restriction + " has too many types, only one is required");
+      }
       var setter = lookup.findSetter(type.parameterType(0), name, type.parameterType(1));
-      var target = setter.asType(methodType(type.returnType(), type.parameterType(0), species.raw())).asType(type);
+      var target = setter.asType(methodType(type.returnType(), type.parameterType(0), restrictionTypes.get(0))).asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -413,8 +421,12 @@ public class RT {
     //System.out.println("bsm_method_restriction " + type + " " + constant);
 
     if (constant instanceof Restriction restriction) {
+      var restrictionTypes = restriction.types();
+      if (restrictionTypes.size() != type.parameterCount()) {
+        throw new LinkageError(restriction + " types count != parameter count");
+      }
       var empty = MethodHandles.empty(type);
-      var target = empty.asType(methodType(type.returnType(), restriction.restrictions())).asType(type);
+      var target = empty.asType(methodType(type.returnType(), restriction.types())).asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
