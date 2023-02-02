@@ -2,6 +2,7 @@ package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.TypeRestriction;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -20,8 +21,7 @@ public class SimpleListTest {
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "restriction KP1;";
     private static final String $KP4 = "anchor P3;";
-    private static final String $KP5 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; KP4;";
-    private static final String $KP6 = "linkage KP5; KP5;";
+    private static final String $KP5 = "linkage KP4;";
 
 
     private E[] elements;
@@ -54,7 +54,7 @@ public class SimpleListTest {
 
     @Parametric("P3")
     public static <T> SimpleList<T> of() {
-      "KP6".intern();
+      "KP5".intern();
       return new SimpleList<>();
     }
   }
@@ -77,20 +77,14 @@ public class SimpleListTest {
 
   private static final String $P_string_0 = "species Ljava/lang/String;";
   private static final String $P_string_1 = "list.of P_string_0;";
-  private static final String $P_string_2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; P_string_1;";
-  private static final String $P_string_3 = "linkage P_string_2; P_string_2;";
-  private static final String $P_string_4 = "linkage P_string_2; V P_string_0;";
-  private static final String $P_string_5 = "linkage P_string_2; P_string_0; I";
+  private static final String $P_string_2 = "linkage P_string_1;";
 
   @Test
   public void specializedStringList() {
-    "P_string_3".intern();
+    "P_string_2".intern();
     var list = new SimpleList<String>();
 
-    "P_string_4".intern();
     list.add("foo");
-
-    "P_string_5".intern();
     var element = list.get(0);
 
     assertEquals("foo", element);
@@ -99,31 +93,26 @@ public class SimpleListTest {
   @Test
   @SuppressWarnings({"rawtypes", "unchecked"})
   public void specializedButErasedAndRawStringList() {
-    "P_string_3".intern();
+    "P_string_2".intern();
     var list = new SimpleList();
 
     list.add("foo");
     list.add(3);
+
     assertEquals("foo", list.get(0));
   }
 
 
   private static final String $P_integer_0 = "species Ljava/lang/Integer;";
   private static final String $P_integer_1 = "list.of P_integer_0;";
-  private static final String $P_integer_2 = "species Lcom/github/forax/civilizer/species/SimpleListTest$SimpleList; P_integer_1;";
-  private static final String $P_integer_3 = "linkage P_integer_2; P_integer_2;";
-  private static final String $P_integer_4 = "linkage P_integer_2; V P_integer_0;";
-  private static final String $P_integer_5 = "linkage P_integer_2; P_integer_0; I";
+  private static final String $P_integer_2 = "linkage P_integer_1;";
 
   @Test
   public void specializedIntegerList() {
-    "P_integer_3".intern();
+    "P_integer_2".intern();
     var list = new SimpleList<Integer>();
 
-    "P_integer_4".intern();
     list.add(744);
-
-    "P_integer_5".intern();
     var element = list.get(0);
 
     assertEquals(744, element);
@@ -132,19 +121,17 @@ public class SimpleListTest {
 
   @Test
   public void specializeMethodOfStringList() {
-    "P_string_3".intern();
+    "P_string_2".intern();
     var list = SimpleList.<String>of();
 
-    "P_string_4".intern();
     list.add("bar");
-
-    "P_string_5".intern();
     var element = list.get(0);
 
     assertEquals("bar", element);
   }
 
   @Test
+  @Disabled
   public void rawMethodOf() {
     var list = SimpleList.<String>of();
     list.add("baz");

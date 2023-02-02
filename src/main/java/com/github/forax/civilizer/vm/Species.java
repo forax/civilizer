@@ -9,6 +9,6 @@ public record Species(Class<?> raw, /*@Nullable*/ Object parameters) {
 
   @Override
   public String toString() {
-    return raw.getSimpleName() + (parameters == null? "": parameters);
+    return "Species " + raw.getSimpleName() + (parameters == null? "": parameters);
   }
 }

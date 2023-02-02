@@ -166,37 +166,13 @@ public class CondyLispTest {
   @Test
   public void condyLispLinkage() {
     class Foo {
-      private static final String $P0 = "linkage Ljava/lang/String; Z D I";
+      private static final String $P0 = "linkage Ljava/lang/String;";
 
       static void test() {
         "P0".intern();
         var value = RT.ldc();
 
-        assertEquals(
-            new Linkage(new Species(String.class, null),
-                null,
-                new Species(boolean.class, null),
-                List.of(new Species(double.class, null), new Species(int.class, null))),
-            value);
-      }
-    }
-  }
-
-  @Test
-  public void condyLispLinkaze() {
-    class Foo {
-      private static final String $P0 = "linkaze 42 Ljava/lang/String; Z D I";
-
-      static void test() {
-        "P0".intern();
-        var value = RT.ldc();
-
-        assertEquals(
-            new Linkage(new Species(String.class, null),
-                42,
-                new Species(boolean.class, null),
-                List.of(new Species(double.class, null), new Species(int.class, null))),
-            value);
+        assertEquals(new Linkage(String.class), value);
       }
     }
   }
@@ -232,11 +208,10 @@ public class CondyLispTest {
       return RT.ldc();
     }
 
-    private static final String $P1 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data; 77";
-    private static final String $P2 = "linkage P1; P1;";
+    private static final String $P1 = "linkage 77";
 
     static void test() {
-      "P2".intern();
+      "P1".intern();
       var data = new Data<>();
 
       var data2 = new Data<>();
@@ -265,16 +240,14 @@ public class CondyLispTest {
     }
 
     private static final String $P1 = "list.of Ljava/lang/String;";
-    private static final String $P2 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data3; P1;";
-    private static final String $P3 = "linkage P2; P2;";
-    private static final String $P4 = "list.of Ljava/lang/String;";
-    private static final String $P5 = "species Lcom/github/forax/civilizer/species/CondyLispTest$Data3; P4;";
-    private static final String $P6 = "linkage P5; P5;";
+    private static final String $P2 = "linkage P1;";
+    private static final String $P3 = "list.of Ljava/lang/String;";
+    private static final String $P4 = "linkage P3;";
 
     static void test() {
-      "P3".intern();
+      "P2".intern();
       var data = new Data3<>();
-      "P6".intern();
+      "P4".intern();
       var data2 = new Data3<>();
 
       assertSame(data.value(), data2.value());
@@ -297,11 +270,10 @@ public class CondyLispTest {
       return RT.ldc();
     }
 
-    private static final String $P1 = "species Lcom/github/forax/civilizer/species/CondyLispTest$MethodData;";
-    private static final String $P2 = "linkaze P1; 42 Ljava/lang/Object;";
+    private static final String $P1 = "linkage 42";
 
     static void test() {
-      "P2".intern();
+      "P1".intern();
       var value = MethodData.value();
 
       assertEquals(42, value);

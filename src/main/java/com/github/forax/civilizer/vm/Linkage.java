@@ -6,21 +6,13 @@ import java.util.Objects;
 
 import static java.util.stream.Collectors.joining;
 
-public record Linkage(Species owner, /*@Nullable*/Object parameters, Species returnType, List<Species> parameterTypes) {
+public record Linkage(Object parameters) {
   public Linkage {
-    Objects.requireNonNull(owner);
-    Objects.requireNonNull(returnType);
-    parameterTypes = List.copyOf(parameterTypes);
-  }
-
-  public MethodType toMethodType() {
-    return MethodType.methodType(returnType.raw(), parameterTypes.stream().<Class<?>>map(Species::raw).toList());
+    Objects.requireNonNull(parameters, "parameters is null");
   }
 
   @Override
   public String toString() {
-    return owner + "."
-        + (parameters == null ? "" : "<" + parameters + ">")
-        + parameterTypes.stream().map(Species::toString).collect(joining(",", "(", ")")) + returnType;
+    return "Linkage " + parameters;
   }
 }

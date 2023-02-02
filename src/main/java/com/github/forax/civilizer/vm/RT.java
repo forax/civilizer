@@ -46,6 +46,7 @@ public class RT {
     throw new LinkageError("this method should be rewritten by the rewriter, so never reach that point");
   }
 
+  @SuppressWarnings("unused")  // used by reflection
   public static Object erase(/*List<Species>*/Object parameters, /*List<Species>*/Object defaultSpecies) {
     var parameterList = parameters == null ? null: ((List<?>) parameters).stream().map(o -> (Species) o).toList();
     var defaultSpeciesList = ((List<?>) defaultSpecies).stream().map(o -> (Species) o).toList();
@@ -62,6 +63,7 @@ public class RT {
         }).toList();
   }
 
+  @SuppressWarnings("unused")  // used by reflection
   public static Object identity(Object parameters) {
     return parameters;
   }
@@ -152,7 +154,7 @@ public class RT {
     });
   }
 
-  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) throws IllegalAccessException {
+  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) {
     var mhInfo = lookup.revealDirect(method);
     var reflected = mhInfo.reflectAs(Method.class, lookup);
     var parametric = reflected.getAnnotation(Parametric.class);
@@ -275,7 +277,7 @@ public class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
-      var methodSpecies = new MethodSpecies(new Species(linkage.owner().raw(), null), name, type.toMethodDescriptorString(), linkage.parameters());
+      var methodSpecies = new MethodSpecies(new Species(owner, null), name, type.toMethodDescriptorString(), linkage.parameters());
       var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
       var mh = insertArguments(method, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(mh);
@@ -350,7 +352,7 @@ public class RT {
     if (constant instanceof Linkage linkage) {
       var owner = type.returnType();
       var init = lookup.findConstructor(owner, type.changeReturnType(void.class).appendParameterTypes(Object.class));
-      var kiddyPoolClass = kiddyPoolClass(lookup, linkage.owner());
+      var kiddyPoolClass = kiddyPoolClass(lookup, new Species(owner, linkage.parameters()));
       var method = insertArguments(init, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(method);
     }
@@ -483,8 +485,7 @@ public class RT {
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
-      case "linkage" -> new Linkage(asSpecies(args[0]), null, asSpecies(args[1]), Arrays.stream(args).skip(2).map(RT::asSpecies).toList());
-      case "linkaze" -> new Linkage(asSpecies(args[0]), args[1], asSpecies(args[2]), Arrays.stream(args).skip(3).map(RT::asSpecies).toList());
+      case "linkage" -> new Linkage(args[0]);
       case "mh" -> {
         yield insertArguments(
             lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
