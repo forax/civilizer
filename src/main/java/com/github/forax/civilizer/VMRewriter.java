@@ -18,8 +18,6 @@ import java.io.IOException;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -44,6 +42,7 @@ import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.DUP;
 import static org.objectweb.asm.Opcodes.GETFIELD;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.H_INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.INVOKEINTERFACE;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
@@ -134,9 +133,9 @@ public class VMRewriter {
       "bsm_raw_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_CLASS_DATA = new Handle(H_INVOKESTATIC, MethodHandles.class.getName().replace('.', '/'),
-      "classData",
-      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+  private static final Handle BSM_RAW_METHOD_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_raw_method_kiddy_pool",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/invoke/MethodHandle;)Ljava/lang/Object;",
       false);
   private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_type",
@@ -359,7 +358,7 @@ public class VMRewriter {
         return super.visitField(access, name, descriptor, signature, value);
       }
 
-      private void delegateMethod(int access, String name, String methodDescriptor, String newMethodDescriptor) {
+      private void delegateMethod(int access, String name, String methodDescriptor, String newMethodDescriptor, Handle bsm, Object... bsmConstants) {
         var mv = super.visitMethod(access, name, methodDescriptor, null, null);
         mv.visitCode();
         int slot;
@@ -376,7 +375,7 @@ public class VMRewriter {
           mv.visitVarInsn(type.getOpcode(ILOAD), slot);
           slot += type.getSize();
         }
-        mv.visitLdcInsn(new ConstantDynamic("rawKiddyPool", "Ljava/lang/Object;", BSM_RAW_KIDDY_POOL));
+        mv.visitLdcInsn(new ConstantDynamic("rawKiddyPool", "Ljava/lang/Object;", bsm, bsmConstants));
         mv.visitMethodInsn(opcode, internalName, name, newMethodDescriptor, false);
         mv.visitInsn(Type.getReturnType(newMethodDescriptor).getOpcode(IRETURN));
         mv.visitMaxs(slot + 1, slot);
@@ -399,7 +398,7 @@ public class VMRewriter {
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
           desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
           var newMethodDescriptor = desc.descriptorString();
-          delegateMethod(access, "<init>", methodDescriptor, newMethodDescriptor);
+          delegateMethod(access, "<init>", methodDescriptor, newMethodDescriptor, BSM_RAW_KIDDY_POOL);
           var mv = super.visitMethod(access | ACC_SYNTHETIC, methodName, newMethodDescriptor, null, null);
           delegate = new MethodVisitor(ASM9, mv) {
             @Override
@@ -445,7 +444,9 @@ public class VMRewriter {
             var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
             desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
             var newMethodDescriptor = desc.descriptorString();
-            delegateMethod(access, methodName, methodDescriptor, newMethodDescriptor);
+            var tag = ((access & ACC_STATIC) != 0) ? H_INVOKESTATIC : H_INVOKEVIRTUAL;
+            var methodHandle = new Handle(tag, internalName, methodName, newMethodDescriptor, false);
+            delegateMethod(access, methodName, methodDescriptor, newMethodDescriptor, BSM_RAW_METHOD_KIDDY_POOL, methodHandle);
             delegate = super.visitMethod(access| ACC_SYNTHETIC, methodName, newMethodDescriptor, signature, exceptions);
           } else {
             delegate = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
@@ -671,14 +672,6 @@ public class VMRewriter {
         if (classData.parametric) {  // parametric class
           var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
           fv.visitEnd();
-        }
-        if (!classData.methodParametricSet.isEmpty()) {  // at least one parametric method
-          var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, "$classData", "()Ljava/lang/Object;", null, null);
-          mv.visitCode();
-          mv.visitLdcInsn(new ConstantDynamic("_", "Ljava/lang/Object;", BSM_CLASS_DATA));
-          mv.visitInsn(ARETURN);
-          mv.visitMaxs(1, 0);
-          mv.visitEnd();
         }
         super.visitEnd();
       }

@@ -95,7 +95,7 @@ public class RT {
 
       @Override
       public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_SYNTHETIC) != 0 && (name.startsWith("$KP") || name.equals("$classData"))) {
+        if ((access & ACC_SYNTHETIC) != 0 && (name.startsWith("$KP") || name.startsWith("$P"))) { //$P are needed only for the anchors
           return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
         return null;
@@ -299,17 +299,17 @@ public class RT {
         // an inlining cache for the receiver
         return new VirtualCallInliningCache(type, lookup,
             receiverClass -> {
-              var parametric = receiverClass.isAnnotationPresent(Parametric.class);
+              var parametric = receiverClass.getAnnotation(Parametric.class);
               var speciesLookup = privateSpeciesLookup(lookup, receiverClass);
-              if (parametric) {
-                // an inlining cache for the kiddyPool "classData" constant pool ref
-                var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, "classData",
-                    classData -> {
-                      var anchor = (Anchor) classData;
-                      var parameters = anchor.classParameters;
+              if (parametric != null) {
+                // an inlining cache for the kiddyPool anchor constant pool ref
+                var kiddyPoolRef = parametric.value();
+                var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, kiddyPoolRef,
+                    classParameters -> {
+
 
                       // call the de-virtualized method with a kiddy pool created with the pair (species parameter + method parameter)
-                      var species = new Species(receiverClass, parameters);
+                      var species = new Species(receiverClass, classParameters);
                       var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
                       var methodSpecies = new MethodSpecies(species, name, type.toMethodDescriptorString(), linkage.parameters());
                       var kiddyPoolClass = kiddyPoolClass(speciesLookup, methodSpecies, method);
@@ -498,6 +498,15 @@ public class RT {
 
   public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
     //System.out.println("bsm_raw_kiddy_pool");
-    return kiddyPoolClass(lookup, new Species(lookup.lookupClass(), null));
+    var species = new Species(lookup.lookupClass(), null);
+    return kiddyPoolClass(lookup, species);
+  }
+
+  public static Object bsm_raw_method_kiddy_pool(Lookup lookup, String name, Class<?> type, MethodHandle method) throws IllegalAccessException {
+    //System.out.println("bsm_raw_method_kiddy_pool");
+    var methodInfo = lookup.revealDirect(method);
+    var species = new Species(lookup.lookupClass(), null);
+    var methodSpecies = new MethodSpecies(species, methodInfo.getName(), methodInfo.getMethodType().toMethodDescriptorString(), null);
+    return kiddyPoolClass(lookup, methodSpecies, method);
   }
 }

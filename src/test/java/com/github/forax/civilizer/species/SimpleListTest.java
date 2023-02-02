@@ -131,7 +131,6 @@ public class SimpleListTest {
   }
 
   @Test
-  @Disabled
   public void rawMethodOf() {
     var list = SimpleList.<String>of();
     list.add("baz");
