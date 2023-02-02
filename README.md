@@ -59,7 +59,7 @@ Each constant can be initialized with a kind of LISP that recognizes the instruc
 - `anchor` <ref>, returns the parameter of the parametric class/method corresponding to <ref>,
 - `linkage` <owner> <returnType> <parameterTypes...> specifies a method signature,
 - `linkaze` <owner> <parameters> <returnType> <parameterTypes...> specifyies a parametric method signature,
-- `lambda` <class> <name> <constArgs...> creates a method handle with one parameter (the constant arguments are appended after the parameter).
+- `mh` <class> <name> <descriptor> <constArgs...> creates a method handle (the constant arguments are inserted at the end).
 
 The arguments of the generics are available at runtime using to forms
 - [Species](src/main/java/com/github/forax/civilizer/vm/Species.java) that specify a generics
@@ -86,7 +86,7 @@ In the constructor, the species `KP1` is used to specialize the array creation.
 class SimpleList<E> {
   private static final String $P0 = "species Ljava/lang/Object;";
   private static final String $P1 = "list.of P0;";
-  private static final String $P2 = "lambda Lcom/github/forax/civilizer/vm/RT; \"erase\" P1;";
+  private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
   private static final String $KP0 = "anchor P2;";
   private static final String $KP1 = "list.get KP0; 0";
   private static final String $KP2 = "linkage LSimpleList; V KP1;";
