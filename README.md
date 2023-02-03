@@ -66,7 +66,7 @@ The arguments of the generics are available at runtime using to forms
 - [Linkage](src/main/java/com/github/forax/civilizer/vm/Linkage.java) that specifies the type parameters for
   the opcodes `new`, `anewarray`, `invokespecial`, `invokevirtual`, `invokeinterface` and `invokestatic`.
 
-To specify a species or a linkage of an operation, the rewriter recognize the pattern
+To specify the linkage of a specialized operation, the rewriter recognize the pattern
 ```java
   "ref".intern();
   operation
