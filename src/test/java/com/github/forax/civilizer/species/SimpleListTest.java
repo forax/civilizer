@@ -11,16 +11,16 @@ import java.util.Objects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class SimpleListTest {
-  @Parametric("P2")
+  @Parametric("P1")
   static class SimpleList<E> {
-    private static final String $P0 = "species Ljava/lang/Object;";
-    private static final String $P1 = "list.of P0;";
-    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $P3 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $KP0 = "anchor P2;";
+    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $KP0 = "anchor P1;";
     private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "restriction KP1;";
-    private static final String $KP4 = "anchor P3;";
+    private static final String $KP2 = "linkage KP1;";
+    private static final String $KP3 = "restriction KP1;";
+    private static final String $KP4 = "anchor P2;";
     private static final String $KP5 = "linkage KP4;";
 
 
@@ -29,7 +29,7 @@ public class SimpleListTest {
 
     SimpleList() {
       super(); // otherwise the constant below will be attached to super()
-      "KP1".intern();
+      "KP2".intern();
       @SuppressWarnings("unchecked")
       var elements = (E[]) new Object[16];
       this.elements = elements;
@@ -39,7 +39,7 @@ public class SimpleListTest {
       return size;
     }
 
-    @TypeRestriction("KP2")
+    @TypeRestriction("KP3")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -52,7 +52,7 @@ public class SimpleListTest {
       return elements[index];
     }
 
-    @Parametric("P3")
+    @Parametric("P2")
     public static <T> SimpleList<T> of() {
       "KP5".intern();
       return new SimpleList<>();
@@ -75,13 +75,12 @@ public class SimpleListTest {
   }
 
 
-  private static final String $P_string_0 = "species Ljava/lang/String;";
-  private static final String $P_string_1 = "list.of P_string_0;";
-  private static final String $P_string_2 = "linkage P_string_1;";
+  private static final String $P_string_0 = "list.of Ljava/lang/String;";
+  private static final String $P_string_1 = "linkage P_string_0;";
 
   @Test
   public void specializedStringList() {
-    "P_string_2".intern();
+    "P_string_1".intern();
     var list = new SimpleList<String>();
 
     list.add("foo");
@@ -93,7 +92,7 @@ public class SimpleListTest {
   @Test
   @SuppressWarnings({"rawtypes", "unchecked"})
   public void specializedButErasedAndRawStringList() {
-    "P_string_2".intern();
+    "P_string_1".intern();
     var list = new SimpleList();
 
     list.add("foo");
@@ -102,14 +101,12 @@ public class SimpleListTest {
     assertEquals("foo", list.get(0));
   }
 
-
-  private static final String $P_integer_0 = "species Ljava/lang/Integer;";
-  private static final String $P_integer_1 = "list.of P_integer_0;";
-  private static final String $P_integer_2 = "linkage P_integer_1;";
+  private static final String $P_integer_0 = "list.of Ljava/lang/Integer;";
+  private static final String $P_integer_1 = "linkage P_integer_0;";
 
   @Test
   public void specializedIntegerList() {
-    "P_integer_2".intern();
+    "P_integer_1".intern();
     var list = new SimpleList<Integer>();
 
     list.add(744);
@@ -121,7 +118,7 @@ public class SimpleListTest {
 
   @Test
   public void specializeMethodOfStringList() {
-    "P_string_2".intern();
+    "P_string_1".intern();
     var list = SimpleList.<String>of();
 
     list.add("bar");

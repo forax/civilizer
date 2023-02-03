@@ -3,6 +3,7 @@ package com.github.forax.civilizer.species;
 import com.github.forax.civilizer.demo.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.TypeRestriction;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,12 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class TypeRestrictionTest {
-  @Parametric("P2")
+  @Parametric("P1")
   static class Holder<T> {
-    private static final String $P0 = "species Ljava/lang/Object;";
-    private static final String $P1 = "list.of P0;";
-    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
-    private static final String $KP0 = "anchor P2;";
+    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $KP0 = "anchor P1;";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "restriction KP1;";
 
@@ -34,12 +34,11 @@ public class TypeRestrictionTest {
   @Test
   public void initIdentityDefault() {
     class Test {
-      private static final String $P0 = "species Ljava/lang/String;";
-      private static final String $P1 = "list.of P0;";
-      private static final String $P2 = "linkage P1;";
+      private static final String $P0 = "list.of Ljava/lang/String;";
+      private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
-        "P2".intern();
+        "P1".intern();
         var holder = new Holder<String>();
 
         var element = holder.get();
@@ -52,12 +51,11 @@ public class TypeRestrictionTest {
   @Test
   public void initZeroDefaultValue() {
     class Test {
-      private static final String $P0 = "species Qcom/github/forax/civilizer/demo/Complex;";
-      private static final String $P1 = "list.of P0;";
-      private static final String $P2 = "linkage P1;";
+      private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
-        "P2".intern();
+        "P1".intern();
         var holder = new Holder<Complex>();
 
         var element = holder.get();
@@ -70,12 +68,11 @@ public class TypeRestrictionTest {
   @Test
   public void putFieldZeroDefaultValue() {
     class Test {
-      private static final String $P0 = "species Qcom/github/forax/civilizer/demo/Complex;";
-      private static final String $P1 = "list.of P0;";
-      private static final String $P2 = "linkage P1;";
+      private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
-        "P2".intern();
+        "P1".intern();
         var holder = new Holder<Complex>();
 
         assertThrows(NullPointerException.class, () -> holder.set(null));

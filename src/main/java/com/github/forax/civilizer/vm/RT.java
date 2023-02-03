@@ -47,19 +47,19 @@ public class RT {
   }
 
   @SuppressWarnings("unused")  // used by reflection
-  public static Object erase(/*List<Species>*/Object parameters, /*List<Species>*/Object defaultSpecies) {
-    var parameterList = parameters == null ? null: ((List<?>) parameters).stream().map(o -> (Species) o).toList();
-    var defaultSpeciesList = ((List<?>) defaultSpecies).stream().map(o -> (Species) o).toList();
-    if (parameters == null) {
-      return defaultSpecies;
+  public static Object erase(/*List<?>*/Object parameters, /*List<?>*/Object defaults) {
+    var parameterList = (List<?>) parameters;
+    var defaultList = (List<?>) defaults;
+    if (parameterList == null) {
+      return defaults;
     }
-    if (parameterList.size() != defaultSpeciesList.size()) {
-      throw new LinkageError("instantiation arguments " + parameters + " and default arguments " + defaultSpeciesList + " have no the same size");
+    if (parameterList.size() != defaultList.size()) {
+      throw new LinkageError("instantiation arguments " + parameters + " and default arguments " + defaultList + " have no the same size");
     }
     return IntStream.range(0, parameterList.size())
         .mapToObj(i -> {
-          var species = parameterList.get(i);
-          return com.github.forax.civilizer.runtime.RT.isSecondaryType(species.raw()) ? species : defaultSpeciesList.get(i);
+          var parameter = parameterList.get(i);
+          return parameter instanceof Class<?> clazz && com.github.forax.civilizer.runtime.RT.isSecondaryType(clazz) ? clazz : defaultList.get(i);
         }).toList();
   }
 
@@ -367,8 +367,9 @@ public class RT {
   public static CallSite bsm_new_array(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_new_array " + type + " " + constant);
 
-    if (constant instanceof Species species) {
-      var newArray = MethodHandles.arrayConstructor(species.raw().arrayType());
+    if (constant instanceof Linkage linkage) {
+      var specializedClass = ((Class<?>) linkage.parameters()).arrayType();
+      var newArray = MethodHandles.arrayConstructor(specializedClass);
       var target = newArray.asType(type);
       return new ConstantCallSite(target);
     }

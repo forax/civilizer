@@ -3,6 +3,7 @@ package com.github.forax.civilizer.species;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.function.Function;
@@ -42,26 +43,24 @@ public class InheritanceTest {
   @Test
   public void test() {
     class StringTest {
-      private static final String $P0 = "species Ljava/lang/String;";
-      private static final String $P1 = "list.of P0;";
-      private static final String $P2 = "linkage P1;";
+      private static final String $P0 = "list.of Ljava/lang/String;";
+      private static final String $P1 = "linkage P0;";
 
-      private static final String $P3 = "species Ljava/lang/Integer;";
-      private static final String $P4 = "list.of P3;";
-      private static final String $P5 = "linkage P4;";
+      private static final String $P2 = "list.of Ljava/lang/Integer;";
+      private static final String $P3 = "linkage P2;";
 
       public static void test() {
-        "P2".intern();
+        "P1".intern();
          var holder = new Holder<>("42");
 
-        "P5".intern();
+        "P3".intern();
         var holder2 = holder.map(Integer::parseInt);
 
          assertAll(
              () -> assertEquals("42", holder.element),
-             () -> assertEquals(new Species(String.class, null), holder.debug()),
+             () -> assertEquals(String.class, holder.debug()),
              () -> assertEquals(42, holder2.element),
-             () -> assertEquals(new Species(Integer.class, null), holder2.debug())
+             () -> assertEquals(Integer.class, holder2.debug())
          );
       }
     }

@@ -5,6 +5,7 @@ import com.github.forax.civilizer.vm.Linkage;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
