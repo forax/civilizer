@@ -53,12 +53,12 @@ There are two kinds of constant pool constants,
 To specify a new constant, the rewriter recognize `static final String` that starts with $P or $KP and
 transforms them to constant.
 Each constant can be initialized with a kind of LISP that recognizes the instructions:
-- `list.of` <args>... creates a list,
-- `list.get` <list> <index> extracts the nth item of a list,
-- `anchor` <ref>, returns the constant pool reference of the parametric class/method corresponding,
-- `linkage` <ref>  specifies a parameters of one of the parametrized opcodes,
-- `restriction` <refs...>  specifies the classes of the method parameters/field type,
-- `mh` <class> <name> <descriptor> <constArgs...> creates a method handle (the constant arguments are inserted at the end).
+- `list.of` &lt;args&gt;... creates a list,
+- `list.get` &lt;list&gt; &lt;index&gt; extracts the nth item of a list,
+- `anchor` &lt;ref&gt;, returns the constant pool reference of the parametric class/method corresponding,
+- `linkage` &lt;ref&gt;  specifies a parameters of one of the parametrized opcodes,
+- `restriction` &lt;refs...&gt;  specifies the classes of the method parameters/field type,
+- `mh` &lt;class&gt; &lt;name&gt; &lt;descriptor&gt; &lt;constArgs...&gt; creates a method handle (the constant arguments are inserted at the end).
 
 The arguments of the generics are available at runtime using to forms
 - [Restriction](src/main/java/com/github/forax/civilizer/vm/Restriction.java) that specify
