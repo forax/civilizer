@@ -45,12 +45,12 @@ This behavior is i believe the same as in Kotlin.
 
 ## VMRewriter
 
-This rewriter allows to declare new constant pool constants ($P and $KP) and to specialize some operations.
+This rewriter allows to declare new constant pool constants ($P and $KP) and to specialize some operations/opcodes.
 There are two kinds of constant pool constants,
 - the constant pool constant that are accessible from the class ($P constant)
 - and the one that are accessible only to instance method ($KP, for kiddy pool constant).
 
-To specify a new constant, the rewriter recognize static final String that starts with $P or $KP and
+To specify a new constant, the rewriter recognize `static final String` that starts with $P or $KP and
 transforms them to constant.
 Each constant can be initialized with a kind of LISP that recognizes the instructions:
 - `list.of` <args>... creates a list,
