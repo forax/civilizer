@@ -136,6 +136,36 @@ public class CondyLispTest {
   }
 
   @Test
+  public void condyLispSpeciesParameters() {
+    class Foo {
+      private static final String $P0 = "species Ljava/util/List; Ljava/lang/Integer;";
+      private static final String $P1 = "species.parameters P0;";
+
+      static void test() {
+        "P0".intern();
+        var value = RT.ldc();
+
+        assertEquals(Integer.class, value);
+      }
+    }
+  }
+
+  @Test
+  public void condyLispSpeciesRaw() {
+    class Foo {
+      private static final String $P0 = "species Ljava/util/List; Ljava/lang/Integer;";
+      private static final String $P1 = "species.raw P0;";
+
+      static void test() {
+        "P0".intern();
+        var value = RT.ldc();
+
+        assertEquals(List.class, value);
+      }
+    }
+  }
+
+  @Test
   public void condyLispListOf() {
     class Foo {
       private static final String $P0 = "list.of Ljava/lang/String; I";

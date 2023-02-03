@@ -466,6 +466,7 @@ public class RT {
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
+      case "species.raw" -> ((Species) args[0]).raw();
       case "species.parameters" -> ((Species) args[0]).parameters();
       case "linkage" -> new Linkage(args[0]);
       case "mh" -> {
