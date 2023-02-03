@@ -451,26 +451,6 @@ public class RT {
     return com.github.forax.civilizer.runtime.RT.asSecondaryType(primaryType);
   }
 
-  private static Species asSpecies(Object o) {
-    if (o instanceof Species species) {
-      return species;
-    }
-    if (o instanceof Class<?> clazz) {
-      return new Species(clazz, null);
-    }
-    throw new IllegalStateException("object " + o + " is not a species or a class");
-  }
-
-  private static Class<?> asClass(Object o) {
-    if (o instanceof Class<?> clazz) {
-      return clazz;
-    }
-    if (o instanceof Species species) {
-      return species.raw();
-    }
-    throw new IllegalStateException("object " + o + " is not a species or a class");
-  }
-
   public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
     //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
@@ -486,13 +466,14 @@ public class RT {
       case "list.of" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
+      case "species.parameters" -> ((Species) args[0]).parameters();
       case "linkage" -> new Linkage(args[0]);
       case "mh" -> {
         yield insertArguments(
             lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
             1, Arrays.stream(args).skip(3).toArray());
       }
-      case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(RT::asClass).toList());
+      case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }
