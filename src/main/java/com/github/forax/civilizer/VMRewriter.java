@@ -687,7 +687,7 @@ public class VMRewriter {
                 }
               }
               case INVOKEVIRTUAL -> {
-                if ((parametricOwner || parametricCall) && constantValue != null) {
+                if (parametricCall && constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
