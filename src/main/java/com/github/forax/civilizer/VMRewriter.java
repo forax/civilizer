@@ -272,7 +272,7 @@ public class VMRewriter {
           case 'V', 'Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D' -> new ConstantDynamic(arg, "Ljava/lang/Object;", BSM_TYPE);
           case 'Q' -> new ConstantDynamic("_", "Ljava/lang/Object;", BSM_QTYPE, Type.getType("L" + arg.substring(1)));
           case 'L' -> Type.getType(arg);
-          case 'K', 'P' -> {
+          case 'P' -> {
             var condyInfo = condyMap.get(arg.substring(0, arg.length() - 1));
             if (condyInfo == null) {
               throw new IllegalStateException("undefined condy " + arg);
