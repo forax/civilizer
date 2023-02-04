@@ -95,7 +95,7 @@ public class RT {
 
       @Override
       public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_SYNTHETIC) != 0 && (name.startsWith("$KP") || name.startsWith("$P"))) {
+        if ((access & ACC_SYNTHETIC) != 0 && name.startsWith("$P")) {
           return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
         return null;
