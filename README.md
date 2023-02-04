@@ -63,7 +63,7 @@ The atoms of a cody-LISP expression are
 - a zero default value type descriptor, starts with 'Q', ends with a semicolon,
 - a method type descriptor, starts with '(',
 - a reference to another constant pool entry, starts with a 'P', ends with a semicolon,
-- a string, starts with a quote (')
+- a string, starts with a quote ('),
 - an integer, starts with a digit,
 - a double, starts with a digit and has a dot (.) in the middle.
 
@@ -101,12 +101,11 @@ class SimpleList<E> {
   private E[] elements;
   private int size;
 
+  @SuppressWarnings("unchecked")
   public SimpleList() {
     super();
     "P5".intern();
-    @SuppressWarnings("unchecked")
-    var elements = (E[]) new Object[16];
-    this.elements = elements;
+    elements = (E[]) new Object[16];  // anewarray is specialized by P5
   }
   
   @TypeRestriction("P6")
@@ -128,7 +127,7 @@ saying that the type argument is the class `Complex`.
   
   public static void main(String[] args) {
     "P1".intern();
-    var list = new SimpleList<Complex>();
+    var list = new SimpleList<Complex>();  // new is specialized by P1
 
     list.add(Complex.of(2.0, 4.0));
 
