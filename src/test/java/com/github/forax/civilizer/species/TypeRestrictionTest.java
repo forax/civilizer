@@ -14,7 +14,7 @@ public class TypeRestrictionTest {
   @Parametric("P1")
   static class Holder<T> {
     private static final String $P0 = "list.of Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $KP0 = "anchor P1;";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "restriction KP1;";

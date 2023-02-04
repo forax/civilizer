@@ -8,7 +8,7 @@ public class Demo {
   static class Foo<T> {
     private static final String $P0 = "species Ljava/lang/Object;";
     private static final String $P1 = "list.of P0;";
-    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; \"erase\" (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
+    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P1;";
     private static final String $KP0 = "anchor P2;";
     private static final String $KP1 = "list.get KP0; 0";
     private static final String $KP2 = "list.of KP1;";

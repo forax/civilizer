@@ -216,7 +216,7 @@ public class CondyLispTest {
   public void ldcClassDataNoArgument() {
     @Parametric("P0")
     class Foo<T> {
-      private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Ljava/lang/Integer;)I";
       private static final String $KP0 = "anchor P0;";
 
       Object value() {
@@ -231,7 +231,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; \"bsmValue\" (Ljava/lang/Integer;)I";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Ljava/lang/Integer;)I";
     private static final String $KP0 = "anchor P0;";
 
     Object value() {
@@ -262,7 +262,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data3<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; \"identity\" (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $KP0 = "anchor P0;";
 
     Object value() {
@@ -292,7 +292,7 @@ public class CondyLispTest {
 
 
   class MethodData {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; \"identity\" (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $KP0 = "anchor P0;";
 
     @Parametric("P0")
