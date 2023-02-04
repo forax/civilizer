@@ -12,6 +12,7 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
 
 
 import java.io.IOException;
@@ -27,10 +28,18 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
@@ -147,7 +156,7 @@ public class VMRewriter {
       false);
 
   private static ClassData analyze(byte[] buffer) {
-    record ProtoCondy(String condyName, String[] tokens) {}
+    record ProtoCondy(String condyName, String action, List<String> args) {}
 
     var anchorMap = new HashMap<String, AnchorKind>();
     var protoCondies = new ArrayList<ProtoCondy>();
@@ -219,8 +228,10 @@ public class VMRewriter {
           System.out.println("  constant pool constant " + fieldName + " value: " + value);
 
           var tokens = s.split(" ");
+          var action = tokens[0];
+          var args = Arrays.stream(tokens).skip(1).toList();
           var condyName = fieldName.substring(1);
-          protoCondies.add(new ProtoCondy(condyName, tokens));
+          protoCondies.add(new ProtoCondy(condyName, action, args));
 
           // an accessor must be generated ?
           if (fieldName.startsWith("$KP")) {
@@ -266,7 +277,7 @@ public class VMRewriter {
           case 'K', 'P' -> {
             var condy = condyMap.get(arg.substring(0, arg.length() - 1));
             if (condy == null) {
-              throw new RewriterException("undefined condy " + arg);
+              throw new IllegalStateException("undefined condy " + arg);
             }
             yield condy;
           }
@@ -284,22 +295,22 @@ public class VMRewriter {
       private void populateCondyMap() {
         for (var protoCondy : protoCondies) {
           var condyName = protoCondy.condyName;
-          var tokens = protoCondy.tokens;
-          var action = tokens[0];
+          var action = protoCondy.action;
+          var protoArgs = protoCondy.args;
           var args = action.equals("anchor") ?
-              decodeAnchorAction(condyName, tokens) :
-              Arrays.stream(tokens).skip(1).map(this::condyArgument).toList();
+              decodeAnchorAction(condyName, protoArgs) :
+              protoArgs.stream().map(this::condyArgument).toList();
           var bsmConstants = Stream.concat(Stream.of(action), args.stream()).toArray();
           var condy = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
           condyMap.put(condyName, condy);
         }
       }
 
-      private List<Object> decodeAnchorAction(String condyName, String[] tokens) {
-        if (tokens.length != 2) {
-          throw new RewriterException("anchor has not the right number of argument " + condyName);
+      private List<Object> decodeAnchorAction(String condyName, List<String> args) {
+        if (args.size() != 1) {
+          throw new RewriterException("anchor should have an argument " + condyName);
         }
-        var argument = condyArgument(tokens[1]);
+        var argument = condyArgument(args.get(0));
         if (!(argument instanceof ConstantDynamic reference)) {
           throw new RewriterException("anchor argument is not a reference to a constant " + condyName);
         }
@@ -310,8 +321,81 @@ public class VMRewriter {
         return List.of(anchorKind.text());
       }
 
+      record RootInfo(String condyName, RootKind kind) {
+        enum RootKind { ANCHOR, CONST }
+
+        public RootInfo merge(RootInfo root, ProtoCondy protoCondy) {
+          return switch (kind) {
+            case ANCHOR -> switch (root.kind) {
+              case ANCHOR -> throw new RewriterException("constant " + protoCondy.condyName + " depends on two anchors " + this +  " " + root);
+              case CONST -> this;
+            };
+            case CONST -> switch (root.kind) {
+              case ANCHOR -> root;
+              case CONST -> this;  // choose the first const
+            };
+          };
+        }
+      }
+
+      private static RootInfo findRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap, LinkedHashMap<ProtoCondy, RootInfo> rootMap) {
+        var cachedRoot = rootMap.get(protoCondy);
+        if (cachedRoot != null) {
+          return cachedRoot;
+        }
+        // an anchor is a root
+        if (protoCondy.action.equals("anchor")) {
+          var root = new RootInfo(protoCondy.condyName, RootInfo.RootKind.ANCHOR);
+          rootMap.put(protoCondy, root);
+          return root;
+        }
+        var root = (RootInfo) null;
+        for(var arg: protoCondy.args) {
+          // dependency ?
+          if (arg.endsWith(";") && (arg.startsWith("P") || arg.startsWith("KP"))) {
+            var dependencyRef = arg.substring(0, arg.length() - 1);
+            var dependency = protoCondyMap.get(dependencyRef);
+            if (dependency == null) {
+              throw new RewriterException("unknown reference " + dependencyRef + " when parsing constant " + protoCondy.condyName);
+            }
+            var dependencyRoot = findRoot(dependency, protoCondyMap, rootMap);
+            if (root == null) {
+              root = dependencyRoot;
+            } else {
+              root = root.merge(dependencyRoot, dependency);
+            }
+          }
+        }
+        if (root == null) {
+          root = new RootInfo(protoCondy.condyName, RootInfo.RootKind.CONST);
+        }
+        rootMap.put(protoCondy, root);
+        return root;
+      }
+
+      private void analyseCondyDependencies() {
+        var protoCondyMap = protoCondies.stream().collect(toMap(ProtoCondy::condyName, p -> p));
+
+        var rootMap = new LinkedHashMap<ProtoCondy, RootInfo>();
+        for (var protoCondy : protoCondies) {
+          findRoot(protoCondy, protoCondyMap, rootMap);
+        }
+
+        var dependencyMap = rootMap.entrySet().stream()
+            .filter(rootEntry -> rootEntry.getValue().kind == RootInfo.RootKind.ANCHOR)
+            .collect(groupingBy(Entry::getValue, mapping(Entry::getKey, toList())));
+        if (dependencyMap.isEmpty()) {
+          return;
+        }
+        System.out.println("  dependencies:");
+        for(var dependencyEntry: dependencyMap.entrySet()) {
+          System.out.println("    anchor " + dependencyEntry.getKey().condyName + " = " + dependencyEntry.getValue().stream().map(ProtoCondy::condyName).collect(joining(", ")));
+        }
+      }
+
       @Override
       public void visitEnd() {
+        analyseCondyDependencies();
         populateCondyMap();
       }
     };
