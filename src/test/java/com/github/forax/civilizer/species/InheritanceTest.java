@@ -43,10 +43,10 @@ public class InheritanceTest {
   @Test
   public void test() {
     class StringTest {
-      private static final String $P0 = "list.of Ljava/lang/String;";
+      private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
 
-      private static final String $P2 = "list.of Ljava/lang/Integer;";
+      private static final String $P2 = "list Ljava/lang/Integer;";
       private static final String $P3 = "linkage P2;";
 
       public static void test() {

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class ValueSpecializedTest {
   @Parametric("P1")
   static class SimpleList<E> {
-    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $KP0 = "anchor P1;";
     private static final String $KP1 = "list.get KP0; 0";
@@ -54,7 +54,7 @@ public class ValueSpecializedTest {
     }
   }
 
-  private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+  private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
   private static final String $P1 = "linkage P0;";
 
   @Test
@@ -106,7 +106,7 @@ public class ValueSpecializedTest {
   @Test
   public void specializedStringDefaultValue() {
     class TestWithString {
-      private static final String $P0 = "list.of Ljava/lang/String;";
+      private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
 
       static void test() {
@@ -122,7 +122,7 @@ public class ValueSpecializedTest {
   @Test
   public void specializedComplexDefaultValue() {
     class TestWithComplex {
-      private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
       private static final String $P1 = "linkage P0;";
 
       static void test() {

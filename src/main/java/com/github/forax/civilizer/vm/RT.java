@@ -463,7 +463,7 @@ public class RT {
           default -> throw new AssertionError("unknown kind " + args[0]);
         };
       }
-      case "list.of" -> List.of(args);
+      case "list" -> List.of(args);
       case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
       case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
       case "species.raw" -> ((Species) args[0]).raw();

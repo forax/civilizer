@@ -6,7 +6,7 @@ import com.github.forax.civilizer.vm.TypeRestriction;
 public class Demo {
   @Parametric("P1")
   static class Foo<T> {
-    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $KP0 = "anchor P1;";
     private static final String $KP1 = "list.get KP0; 0";
@@ -26,7 +26,7 @@ public class Demo {
     }
   }
 
-  private static final String $P2= "list.of Ljava/lang/String;";
+  private static final String $P2= "list Ljava/lang/String;";
   private static final String $P3 = "linkage P2;";
 
 

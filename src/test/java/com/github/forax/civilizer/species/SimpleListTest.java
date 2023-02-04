@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class SimpleListTest {
   @Parametric("P1")
   static class SimpleList<E> {
-    private static final String $P0 = "list.of Ljava/lang/Object;";
+    private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $KP0 = "anchor P1;";
@@ -75,7 +75,7 @@ public class SimpleListTest {
   }
 
 
-  private static final String $P_string_0 = "list.of Ljava/lang/String;";
+  private static final String $P_string_0 = "list Ljava/lang/String;";
   private static final String $P_string_1 = "linkage P_string_0;";
 
   @Test
@@ -101,7 +101,7 @@ public class SimpleListTest {
     assertEquals("foo", list.get(0));
   }
 
-  private static final String $P_integer_0 = "list.of Ljava/lang/Integer;";
+  private static final String $P_integer_0 = "list Ljava/lang/Integer;";
   private static final String $P_integer_1 = "linkage P_integer_0;";
 
   @Test

@@ -168,7 +168,7 @@ public class CondyLispTest {
   @Test
   public void condyLispListOf() {
     class Foo {
-      private static final String $P0 = "list.of Ljava/lang/String; I";
+      private static final String $P0 = "list Ljava/lang/String; I";
 
       static void test() {
         "P0".intern();
@@ -270,9 +270,9 @@ public class CondyLispTest {
       return RT.ldc();
     }
 
-    private static final String $P1 = "list.of Ljava/lang/String;";
+    private static final String $P1 = "list Ljava/lang/String;";
     private static final String $P2 = "linkage P1;";
-    private static final String $P3 = "list.of Ljava/lang/String;";
+    private static final String $P3 = "list Ljava/lang/String;";
     private static final String $P4 = "linkage P3;";
 
     static void test() {

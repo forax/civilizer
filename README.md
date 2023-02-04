@@ -53,7 +53,7 @@ There are two kinds of constant pool constants,
 To specify a new constant, the rewriter recognize `static final String` that starts with $P or $KP and
 transforms them to constant.
 Each constant can be initialized with a kind of LISP that recognizes the instructions:
-- `list.of` &lt;args&gt;... creates a list,
+- `list` &lt;args&gt;... creates a list,
 - `list.get` &lt;list&gt; &lt;index&gt; extracts the nth item of a list,
 - `anchor` &lt;ref&gt;, returns the constant pool reference of the parametric class/method corresponding,
 - `linkage` &lt;ref&gt;  specifies a parameters of one of the parametrized opcodes,
