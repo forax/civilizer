@@ -8,12 +8,12 @@ public class Demo {
   static class Foo<T> {
     private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
-    private static final String $KP0 = "anchor P1;";
-    private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "restriction KP1;";
-    private static final String $KP3 = "linkage KP0;";
+    private static final String $PA0 = "anchor P1;";
+    private static final String $PA1 = "list.get PA0; 0";
+    private static final String $PA2 = "restriction PA1;";
+    private static final String $PA3 = "linkage PA0;";
 
-    @TypeRestriction("KP2")
+    @TypeRestriction("PA2")
     private T t;
 
     Foo(T t) { this.t = t; }
@@ -21,7 +21,7 @@ public class Demo {
     T get() { return t; }
 
     Foo<T> id() {
-      "KP3".intern();
+      "PA3".intern();
       return new Foo<T>(t);
     }
   }

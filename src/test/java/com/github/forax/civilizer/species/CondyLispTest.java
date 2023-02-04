@@ -217,10 +217,10 @@ public class CondyLispTest {
     @Parametric("P0")
     class Foo<T> {
       private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Ljava/lang/Integer;)I";
-      private static final String $KP0 = "anchor P0;";
+      private static final String $P1 = "anchor P0;";
 
       Object value() {
-        "KP0".intern();
+        "P1".intern();
         return RT.ldc();
       }
     }
@@ -232,17 +232,16 @@ public class CondyLispTest {
   @Parametric("P0")
   record Data<T>() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Ljava/lang/Integer;)I";
-    private static final String $KP0 = "anchor P0;";
+    private static final String $P1 = "anchor P0;";
+    private static final String $P2 = "linkage 77";
 
     Object value() {
-      "KP0".intern();
+      "P1".intern();
       return RT.ldc();
     }
 
-    private static final String $P1 = "linkage 77";
-
     static void test() {
-      "P1".intern();
+      "P2".intern();
       var data = new Data<>();
 
       var data2 = new Data<>();
@@ -263,22 +262,21 @@ public class CondyLispTest {
   @Parametric("P0")
   record Data3<T>() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final String $KP0 = "anchor P0;";
+    private static final String $P1 = "anchor P0;";
+    private static final String $P2 = "list Ljava/lang/String;";
+    private static final String $P3 = "linkage P2;";
+    private static final String $P4 = "list Ljava/lang/String;";
+    private static final String $P5 = "linkage P4;";
 
     Object value() {
-      "KP0".intern();
+      "P1".intern();
       return RT.ldc();
     }
 
-    private static final String $P1 = "list Ljava/lang/String;";
-    private static final String $P2 = "linkage P1;";
-    private static final String $P3 = "list Ljava/lang/String;";
-    private static final String $P4 = "linkage P3;";
-
     static void test() {
-      "P2".intern();
+      "P3".intern();
       var data = new Data3<>();
-      "P4".intern();
+      "P5".intern();
       var data2 = new Data3<>();
 
       assertSame(data.value(), data2.value());
@@ -293,18 +291,19 @@ public class CondyLispTest {
 
   class MethodData {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final String $KP0 = "anchor P0;";
+    private static final String $P1 = "anchor P0;";
+    private static final String $P2 = "linkage 42";
 
     @Parametric("P0")
     static Object value() {
-      "KP0".intern();
+      "P1".intern();
       return RT.ldc();
     }
 
-    private static final String $P1 = "linkage 42";
+
 
     static void test() {
-      "P1".intern();
+      "P2".intern();
       var value = MethodData.value();
 
       assertEquals(42, value);

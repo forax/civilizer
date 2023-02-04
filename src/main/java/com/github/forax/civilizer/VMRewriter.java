@@ -223,7 +223,7 @@ public class VMRewriter {
 
       @Override
       public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
-        if ((fieldName.startsWith("$KP") || fieldName.startsWith("$P")) && value instanceof String s) {
+        if (fieldName.startsWith("$P") && value instanceof String s) {
           // constant pool description
           System.out.println("  constant pool constant " + fieldName + " value: " + value);
 
@@ -439,14 +439,14 @@ public class VMRewriter {
       private CondyInfo findCondyInfo(String ldcConstant) {
         var condyInfo =  classData.condyMap.get(ldcConstant);
         if (condyInfo == null) {
-          throw new RewriterException("unknown constant pool constant '" + ldcConstant + "'");
+          throw new RewriterException("unknown constant pool constant '" + ldcConstant + "' in class " + internalName);
         }
         return condyInfo;
       }
 
       @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-        if ((name.startsWith("$KP") || name.startsWith("$P"))) {
+        if (name.startsWith("$P")) {
           var condyName = name.substring(1);
           var condyInfo = findCondyInfo(condyName);
           if (classData.condyFieldAccessors.contains(name)) {

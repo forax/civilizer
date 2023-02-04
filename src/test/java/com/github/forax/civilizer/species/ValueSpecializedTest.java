@@ -20,17 +20,17 @@ public class ValueSpecializedTest {
   static class SimpleList<E> {
     private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
-    private static final String $KP0 = "anchor P1;";
-    private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "linkage KP1;";
-    private static final String $KP3 = "restriction KP1;";
+    private static final String $PA0 = "anchor P1;";
+    private static final String $PA1 = "list.get PA0; 0";
+    private static final String $PA2 = "linkage PA1;";
+    private static final String $PA3 = "restriction PA1;";
 
     private E[] elements;
     private int size;
 
     SimpleList() {
       super(); // otherwise the annotation below will be attached to super()
-      "KP2".intern();
+      "PA2".intern();
       @SuppressWarnings("unchecked")
       var elements = (E[]) new Object[16];
       this.elements = elements;
@@ -40,7 +40,7 @@ public class ValueSpecializedTest {
       return size;
     }
 
-    @TypeRestriction("KP3")
+    @TypeRestriction("PA3")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -91,13 +91,13 @@ public class ValueSpecializedTest {
 
   record MethodData() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final String $KP0 = "anchor P0;";
-    private static final String $KP1 = "list.get KP0; 0";
+    private static final String $PM0 = "anchor P0;";
+    private static final String $PM1 = "list.get PM0; 0";
 
     @Parametric("P0")
     @SuppressWarnings("unchecked")
     static <T> T defaultValue() {
-      "KP1".intern();
+      "PM1".intern();
       var argument = (Class<?>) RT.ldc();
       return (T) Array.get(Array.newInstance(argument, 1), 0);
     }

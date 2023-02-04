@@ -15,11 +15,11 @@ public class TypeRestrictionTest {
   static class Holder<T> {
     private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
-    private static final String $KP0 = "anchor P1;";
-    private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "restriction KP1;";
+    private static final String $PA0 = "anchor P1;";
+    private static final String $PA1 = "list.get PA0; 0";
+    private static final String $PA2 = "restriction PA1;";
 
-    @TypeRestriction("KP2")
+    @TypeRestriction("PA2")
     private T t;
 
     Holder() { }

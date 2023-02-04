@@ -17,10 +17,10 @@ public class InheritanceTest {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
 
-    private static final String $KP0 = "anchor P0;";
-    private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "anchor P1;";
-    private static final String $KP3 = "linkage KP2;";
+    private static final String $PA_0 = "anchor P0;";
+    private static final String $PA_1 = "list.get PA_0; 0";
+    private static final String $PB_0 = "anchor P1;";
+    private static final String $PB_1 = "linkage PB_0;";
 
     final T element;
 
@@ -29,13 +29,13 @@ public class InheritanceTest {
     }
 
     private Object debug() {
-      "KP1".intern();
+      "PA_1".intern();
       return RT.ldc();
     }
 
     @Parametric("P1")
     <U> Holder<U> map(Function<? super T, ? extends U> fun) {
-      "KP3".intern();
+      "PB_1".intern();
       return new Holder<>(fun.apply(element));
     }
   }
