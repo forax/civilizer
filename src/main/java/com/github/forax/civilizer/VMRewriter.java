@@ -12,8 +12,6 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.analysis.AnalyzerException;
-
 
 import java.io.IOException;
 import java.lang.constant.ClassDesc;
@@ -31,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -72,9 +71,10 @@ public class VMRewriter {
       return name().toLowerCase(Locale.ROOT);
     }
   }
+  record CondyInfo(boolean inKiddyPool, ConstantDynamic constantDynamic) {}
   record ClassData(String internalName,
                    boolean parametric,
-                   HashMap<String, ConstantDynamic> condyMap,
+                   HashMap<String, CondyInfo> condyMap,
                    HashSet<String> condyFieldAccessors,
                    LinkedHashMap<Field,FieldRestriction> fieldRestrictionMap,
                    HashSet<Method> methodParametricSet,
@@ -160,7 +160,7 @@ public class VMRewriter {
 
     var anchorMap = new HashMap<String, AnchorKind>();
     var protoCondies = new ArrayList<ProtoCondy>();
-    var condyMap = new LinkedHashMap<String, ConstantDynamic>();
+    var condyMap = new LinkedHashMap<String, CondyInfo>();
     var condyFieldAccessors = new HashSet<String> ();
     var fieldRestrictionMap = new LinkedHashMap<Field,FieldRestriction>();
     var methodParametricSet = new HashSet<Method>();
@@ -228,6 +228,9 @@ public class VMRewriter {
           System.out.println("  constant pool constant " + fieldName + " value: " + value);
 
           var tokens = s.split(" ");
+          if (tokens.length < 1) {
+            throw new RewriterException("malformed constant value, it should start with an action, " + value);
+          }
           var action = tokens[0];
           var args = Arrays.stream(tokens).skip(1).toList();
           var condyName = fieldName.substring(1);
@@ -270,11 +273,11 @@ public class VMRewriter {
           case 'Q' -> new ConstantDynamic("_", "Ljava/lang/Object;", BSM_QTYPE, Type.getType("L" + arg.substring(1)));
           case 'L' -> Type.getType(arg);
           case 'K', 'P' -> {
-            var condy = condyMap.get(arg.substring(0, arg.length() - 1));
-            if (condy == null) {
+            var condyInfo = condyMap.get(arg.substring(0, arg.length() - 1));
+            if (condyInfo == null) {
               throw new IllegalStateException("undefined condy " + arg);
             }
-            yield condy;
+            yield condyInfo.constantDynamic;
           }
           case '(' -> Type.getMethodType(arg);
           case '\'' -> arg.substring(1);
@@ -287,7 +290,7 @@ public class VMRewriter {
         };
       }
 
-      private void populateCondyMap() {
+      private void populateCondyMap(Set<ProtoCondy> kiddyPoolConstants) {
         for (var protoCondy : protoCondies) {
           var condyName = protoCondy.condyName;
           var action = protoCondy.action;
@@ -296,8 +299,10 @@ public class VMRewriter {
               decodeAnchorAction(condyName, protoArgs) :
               protoArgs.stream().map(this::condyArgument).toList();
           var bsmConstants = Stream.concat(Stream.of(action), args.stream()).toArray();
-          var condy = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
-          condyMap.put(condyName, condy);
+          var constantDynamic = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
+          var inKiddyPool = kiddyPoolConstants.contains(protoCondy);
+          var condyInfo = new CondyInfo(inKiddyPool, constantDynamic);
+          condyMap.put(condyName, condyInfo);
         }
       }
 
@@ -381,7 +386,7 @@ public class VMRewriter {
         }
       }
 
-      private void analyzeCondyDependencies() {
+      private Set<ProtoCondy> analyzeCondyDependencies() {
         var protoCondyMap = protoCondies.stream().collect(toMap(ProtoCondy::condyName, p -> p));
         var rootMap = new LinkedHashMap<ProtoCondy, RootInfo>();
         for (var protoCondy : protoCondies) {
@@ -389,20 +394,22 @@ public class VMRewriter {
         }
         dumpDependencyAnalysis(rootMap);
 
-        for(var entry: rootMap.entrySet()) {
-          var reachableByAnAnchor = entry.getValue().kind == RootInfo.RootKind.ANCHOR;
-          // an accessor must be generated ?
-          if (reachableByAnAnchor) {
-            var fieldName = "$" + entry.getKey().condyName;
-            condyFieldAccessors.add(fieldName);
-          }
+        var kiddyPoolConstants = rootMap.entrySet().stream()
+            .filter(entry -> entry.getValue().kind == RootInfo.RootKind.ANCHOR)
+            .map(Entry::getKey)
+            .collect(Collectors.toSet());
+        // an accessor must be generated ?
+        for(var protoCondy: kiddyPoolConstants) {
+          var fieldName = "$" + protoCondy.condyName;
+          condyFieldAccessors.add(fieldName);
         }
+        return kiddyPoolConstants;
       }
 
       @Override
       public void visitEnd() {
-        analyzeCondyDependencies();
-        populateCondyMap();
+        var kiddyPoolConstants = analyzeCondyDependencies();
+        populateCondyMap(kiddyPoolConstants);
       }
     };
     reader.accept(cv, 0);
@@ -429,16 +436,24 @@ public class VMRewriter {
     var classData = analysis.classDataMap.get(internalName);
     var writer = new ClassWriter(0);
     var cv = new ClassVisitor(ASM9, writer) {
+      private CondyInfo findCondyInfo(String ldcConstant) {
+        var condyInfo =  classData.condyMap.get(ldcConstant);
+        if (condyInfo == null) {
+          throw new RewriterException("unknown constant pool constant '" + ldcConstant + "'");
+        }
+        return condyInfo;
+      }
+
       @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
         if ((name.startsWith("$KP") || name.startsWith("$P"))) {
           var condyName = name.substring(1);
-          var condy = classData.condyMap.get(condyName);
+          var condyInfo = findCondyInfo(condyName);
           if (classData.condyFieldAccessors.contains(name)) {
-            // we also need accessors for the constant dynamic referenced from outside
+            // we need accessors for the constant dynamic referenced from outside
             var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, name, "()Ljava/lang/Object;", null, null);
             mv.visitCode();
-            mv.visitLdcInsn(condy);
+            mv.visitLdcInsn(condyInfo.constantDynamic);
             mv.visitInsn(ARETURN);
             mv.visitMaxs(1, 0);
             mv.visitEnd();
@@ -472,14 +487,6 @@ public class VMRewriter {
         mv.visitEnd();
       }
 
-      private ConstantDynamic findCondy(String ldcConstant) {
-        var condy =  classData.condyMap.get(ldcConstant);
-        if (condy == null) {
-          throw new RewriterException("unknown constant pool constant '" + ldcConstant + "'");
-        }
-        return condy;
-      }
-
       @Override
       public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
         var parametricMethod = classData.methodParametricSet.contains(new Method(methodName, methodDescriptor));
@@ -509,10 +516,10 @@ public class VMRewriter {
                   var field = fieldEntry.getKey();
                   var constant = fieldRestriction.constant;
                   mv.visitVarInsn(ALOAD, 0);
-                  var condy = findCondy(constant);
-                  var constantValue = constant.startsWith("P") ? condy : constant;
+                  var condyInfo = findCondyInfo(constant);
+                  var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic;  // FIXME
                   var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(field.descriptor));
-                  if (!(constantValue instanceof ConstantDynamic)) {
+                  if (condyInfo.inKiddyPool) {
                     mv.visitVarInsn(ALOAD, kiddyPoolSlot); // load $kiddyPool
                     desc = desc.insertParameterTypes(0, ConstantDescs.CD_Object);
                   }
@@ -561,10 +568,10 @@ public class VMRewriter {
                 mv.visitVarInsn(type.getOpcode(ILOAD), slot);
                 slot += type.getSize();
               }
-              var condy = findCondy(constant);
-              var constantValue = constant.startsWith("P") ? condy : constant;
+              var condyInfo = findCondyInfo(constant);
+              var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic;
               var desc = MethodTypeDesc.ofDescriptor(methodDescriptor).changeReturnType(ConstantDescs.CD_void);
-              if (!(constantValue instanceof ConstantDynamic)) {
+              if (condyInfo.inKiddyPool) {
                 loadKiddyPool();
                 desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
               }
@@ -604,10 +611,10 @@ public class VMRewriter {
               var fieldRestriction = classData.fieldRestrictionMap.get(new Field(name, descriptor));
               if (fieldRestriction != null) {
                 var constant = fieldRestriction.constant;
-                var condy = findCondy(constant);
-                var constantValue = constant.startsWith("P") ? condy : constant;
+                var condyInfo = findCondyInfo(constant);
+                var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic ;  // FIXME
                 var desc = MethodTypeDesc.of(ConstantDescs.CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
-                if (!(constantValue instanceof ConstantDynamic)) {
+                if (condyInfo.inKiddyPool) {
                   loadKiddyPool();
                   desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
                 }
@@ -624,8 +631,8 @@ public class VMRewriter {
               // record constant
               var constant = ldcConstant;
               ldcConstant = null;
-              var condy = findCondy(constant);
-              constantValue = constant.startsWith("P") ? condy : constant;
+              var condyInfo = findCondyInfo(constant);
+              constantValue = condyInfo.inKiddyPool ?  constant : condyInfo.constantDynamic;
               mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
               return;
             }

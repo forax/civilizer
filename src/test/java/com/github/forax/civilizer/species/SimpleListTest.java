@@ -16,12 +16,12 @@ public class SimpleListTest {
     private static final String $P0 = "list Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
-    private static final String $KP0 = "anchor P1;";
-    private static final String $KP1 = "list.get KP0; 0";
-    private static final String $KP2 = "linkage KP1;";
-    private static final String $KP3 = "restriction KP1;";
-    private static final String $KP4 = "anchor P2;";
-    private static final String $KP5 = "linkage KP4;";
+    private static final String $P3 = "anchor P1;";
+    private static final String $P4 = "list.get P3; 0";
+    private static final String $P5 = "linkage P4;";
+    private static final String $P6 = "restriction P4;";
+    private static final String $P7 = "anchor P2;";
+    private static final String $P8 = "linkage P7;";
 
 
     private E[] elements;
@@ -29,7 +29,7 @@ public class SimpleListTest {
 
     SimpleList() {
       super(); // otherwise the constant below will be attached to super()
-      "KP2".intern();
+      "P5".intern();
       @SuppressWarnings("unchecked")
       var elements = (E[]) new Object[16];
       this.elements = elements;
@@ -39,7 +39,7 @@ public class SimpleListTest {
       return size;
     }
 
-    @TypeRestriction("KP3")
+    @TypeRestriction("P6")
     public void add(E element) {
       if (size == elements.length) {
         elements = Arrays.copyOf(elements, elements.length << 1);
@@ -54,7 +54,7 @@ public class SimpleListTest {
 
     @Parametric("P2")
     public static <T> SimpleList<T> of() {
-      "KP5".intern();
+      "P8".intern();
       return new SimpleList<>();
     }
   }
