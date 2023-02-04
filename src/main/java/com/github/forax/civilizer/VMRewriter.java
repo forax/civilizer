@@ -232,11 +232,6 @@ public class VMRewriter {
           var args = Arrays.stream(tokens).skip(1).toList();
           var condyName = fieldName.substring(1);
           protoCondies.add(new ProtoCondy(condyName, action, args));
-
-          // an accessor must be generated ?
-          if (fieldName.startsWith("$KP")) {
-            condyFieldAccessors.add(fieldName);
-          }
         }
 
         return new FieldVisitor(ASM9) {
@@ -373,14 +368,7 @@ public class VMRewriter {
         return root;
       }
 
-      private void analyseCondyDependencies() {
-        var protoCondyMap = protoCondies.stream().collect(toMap(ProtoCondy::condyName, p -> p));
-
-        var rootMap = new LinkedHashMap<ProtoCondy, RootInfo>();
-        for (var protoCondy : protoCondies) {
-          findRoot(protoCondy, protoCondyMap, rootMap);
-        }
-
+      private static void dumpDependencyAnalysis(LinkedHashMap<ProtoCondy, RootInfo> rootMap) {
         var dependencyMap = rootMap.entrySet().stream()
             .filter(rootEntry -> rootEntry.getValue().kind == RootInfo.RootKind.ANCHOR)
             .collect(groupingBy(Entry::getValue, mapping(Entry::getKey, toList())));
@@ -389,13 +377,31 @@ public class VMRewriter {
         }
         System.out.println("  dependencies:");
         for(var dependencyEntry: dependencyMap.entrySet()) {
-          System.out.println("    anchor " + dependencyEntry.getKey().condyName + " = " + dependencyEntry.getValue().stream().map(ProtoCondy::condyName).collect(joining(", ")));
+          System.out.println("    anchor " + dependencyEntry.getKey().condyName + ": " + dependencyEntry.getValue().stream().map(ProtoCondy::condyName).collect(joining(", ")));
+        }
+      }
+
+      private void analyzeCondyDependencies() {
+        var protoCondyMap = protoCondies.stream().collect(toMap(ProtoCondy::condyName, p -> p));
+        var rootMap = new LinkedHashMap<ProtoCondy, RootInfo>();
+        for (var protoCondy : protoCondies) {
+          findRoot(protoCondy, protoCondyMap, rootMap);
+        }
+        dumpDependencyAnalysis(rootMap);
+
+        for(var entry: rootMap.entrySet()) {
+          var reachableByAnAnchor = entry.getValue().kind == RootInfo.RootKind.ANCHOR;
+          // an accessor must be generated ?
+          if (reachableByAnAnchor) {
+            var fieldName = "$" + entry.getKey().condyName;
+            condyFieldAccessors.add(fieldName);
+          }
         }
       }
 
       @Override
       public void visitEnd() {
-        analyseCondyDependencies();
+        analyzeCondyDependencies();
         populateCondyMap();
       }
     };
