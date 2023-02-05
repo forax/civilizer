@@ -117,31 +117,19 @@ public final class VMRewriter {
     }
   }
   private record CondyInfo(boolean inKiddyPool, ConstantDynamic constantDynamic) {}
+  @SuppressWarnings("CollectionDeclaredAsConcreteClass")
   private record ClassData(String internalName,
-                   boolean parametric,
-                   HashMap<String, CondyInfo> condyMap,
-                   HashSet<String> condyFieldAccessors,
-                   LinkedHashMap<Field,FieldRestriction> fieldRestrictionMap,
-                   HashSet<Method> methodParametricSet,
-                   HashMap<Method, String> methodRestrictionMap) {}
-  private record Analysis(HashMap<String,ClassData> classDataMap) {
-    void dump() {
-      for(var classData: classDataMap.values()) {
-        System.out.println("class " + classData.internalName);
-        System.out.println("  parametric: " + classData.parametric);
-      }
-    }
-  }
+                           boolean parametric,
+                           HashMap<String, CondyInfo> condyMap,
+                           HashSet<String> condyFieldAccessors,
+                           LinkedHashMap<Field,FieldRestriction> fieldRestrictionMap,
+                           HashSet<Method> methodParametricSet,
+                           HashMap<Method, String> methodRestrictionMap) {}
+  private record Analysis(HashMap<String,ClassData> classDataMap) { }
 
   private static final class RewriterException extends RuntimeException {
     RewriterException(String message) {
       super(message);
-    }
-    RewriterException(String message, Throwable cause) {
-      super(message, cause);
-    }
-    RewriterException(Throwable cause) {
-      super(cause);
     }
   }
 
@@ -303,9 +291,7 @@ public final class VMRewriter {
               return parametricAnnotationVisitor(AnchorKind.METHOD);
             }
             if (descriptor.equals(TYPE_RESTRICTION_DESCRIPTOR)) {
-              return restrictionAnnotationVisitor(value -> {
-                methodRestrictionMap.put(new Method(methodName, methodDescriptor), value);
-              });
+              return restrictionAnnotationVisitor(value -> methodRestrictionMap.put(new Method(methodName, methodDescriptor), value));
             }
             return null;
           }
@@ -367,7 +353,7 @@ public final class VMRewriter {
       }
 
       private record RootInfo(String condyName, RootKind kind) {
-        enum RootKind { ANCHOR, CONST }
+        private enum RootKind { ANCHOR, CONST }
 
         RootInfo merge(RootInfo root, ProtoCondy protoCondy) {
           return switch (kind) {
@@ -562,7 +548,6 @@ public final class VMRewriter {
                   var constant = fieldRestriction.constant;
                   mv.visitVarInsn(ALOAD, 0);
                   var condyInfo = findCondyInfo(constant);
-                  var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic;  // FIXME
                   var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(field.descriptor));
                   if (condyInfo.inKiddyPool) {
                     mv.visitVarInsn(ALOAD, kiddyPoolSlot); // load $kiddyPool
@@ -614,7 +599,6 @@ public final class VMRewriter {
                 slot += type.getSize();
               }
               var condyInfo = findCondyInfo(constant);
-              var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic;
               var desc = MethodTypeDesc.ofDescriptor(methodDescriptor).changeReturnType(ConstantDescs.CD_void);
               if (condyInfo.inKiddyPool) {
                 loadKiddyPool();
@@ -657,7 +641,6 @@ public final class VMRewriter {
               if (fieldRestriction != null) {
                 var constant = fieldRestriction.constant;
                 var condyInfo = findCondyInfo(constant);
-                var constantValue = condyInfo.inKiddyPool ? constant : condyInfo.constantDynamic ;  // FIXME
                 var desc = MethodTypeDesc.of(ConstantDescs.CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
                 if (condyInfo.inKiddyPool) {
                   loadKiddyPool();

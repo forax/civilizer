@@ -154,9 +154,8 @@ public final class RT {
     var bsmPoolRef = parametric.value();
     var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
     var keySpecies = new Species(species.raw(), parameters);
-    return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies, sp -> {
-      return createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null));
-    });
+    return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
+        sp -> createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null)));
   }
 
   private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) {
@@ -170,9 +169,8 @@ public final class RT {
     var bsmPoolRef = parametric.value();
     var methodParameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.methodParameters);
     var keyMethodSpecies = new MethodSpecies(methodSpecies.species, methodSpecies.name, methodSpecies.descriptor, methodParameters);
-    return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies, msp -> {
-      return createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.species.parameters(), msp.methodParameters));
-    });
+    return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies,
+        msp -> createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.species.parameters(), msp.methodParameters)));
   }
 
   private static final class KiddyPoolRefInliningCache extends MutableCallSite {
@@ -270,6 +268,7 @@ public final class RT {
     }
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_ldc(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_ldc " + constant + " (instance of " + constant.getClass() + ")");
     if (constant instanceof String kiddyPoolRef) {
@@ -279,6 +278,7 @@ public final class RT {
     return new ConstantCallSite(MethodHandles.constant(Object.class, constant));
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) throws NoSuchMethodException, IllegalAccessException {
     //System.out.println("bsm_static " + name + type + " " + constant);
 
@@ -297,6 +297,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + owner + " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_virtual(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
     //System.out.println("bsm_virtual " + name + type + " " + constant);
 
@@ -351,6 +352,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_new(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchMethodException, IllegalAccessException {
     //System.out.println("bsm_new " + type + " " + constant + "(instance of " +constant.getClass() + ")");
 
@@ -369,6 +371,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type + " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_new_array(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_new_array " + type + " " + constant);
 
@@ -386,6 +389,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_init_default(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_init_default " + type + " " + constant);
 
@@ -405,6 +409,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_put_value(Lookup lookup, String name, MethodType type, Object constant) throws NoSuchFieldException, IllegalAccessException {
     //System.out.println("bsm_put_value_check " + type + " " + constant);
 
@@ -425,6 +430,7 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_method_restriction(Lookup lookup, String name, MethodType type, Object constant) {
     //System.out.println("bsm_method_restriction " + type + " " + constant);
 
@@ -445,17 +451,20 @@ public final class RT {
     throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
   }
 
-  public static Object bsm_type(Lookup lookup, String name, Class<?> type) throws IllegalAccessException, ClassNotFoundException {
+  @SuppressWarnings("unused") // used by reflection
+  public static Object bsm_type(Lookup lookup, String name, Class<?> type) {
     //System.out.println("bsm_type " + name);
     // primitiveClass() is not called directly to avoid to have java/lang/Class in the descriptors
     return ConstantBootstraps.primitiveClass(lookup, name, Class.class);
   }
 
-  public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) throws IllegalAccessException, ClassNotFoundException {
+  @SuppressWarnings("unused") // used by reflection
+  public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) {
     //System.out.println("bsm_qtype " + primaryType.getName());
     return com.github.forax.civilizer.runtime.RT.asSecondaryType(primaryType);
   }
 
+  @SuppressWarnings("unused") // used by reflection
   public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
     //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
 
@@ -474,23 +483,23 @@ public final class RT {
       case "species.raw" -> ((Species) args[0]).raw();
       case "species.parameters" -> ((Species) args[0]).parameters();
       case "linkage" -> new Linkage(args[0]);
-      case "mh" -> {
-        yield insertArguments(
-            lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType)args[2]),
+      case "mh" -> insertArguments(
+            lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]),
             1, Arrays.stream(args).skip(3).toArray());
-      }
       case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }
 
-  public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
+  @SuppressWarnings("unused") // used by reflection
+  public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) {
     //System.out.println("bsm_raw_kiddy_pool");
     var species = new Species(lookup.lookupClass(), null);
     return kiddyPoolClass(lookup, species);
   }
 
-  public static Object bsm_raw_method_kiddy_pool(Lookup lookup, String name, Class<?> type, MethodHandle method) throws IllegalAccessException {
+  @SuppressWarnings("unused") // used by reflection
+  public static Object bsm_raw_method_kiddy_pool(Lookup lookup, String name, Class<?> type, MethodHandle method) {
     //System.out.println("bsm_raw_method_kiddy_pool");
     var methodInfo = lookup.revealDirect(method);
     var species = new Species(lookup.lookupClass(), null);
