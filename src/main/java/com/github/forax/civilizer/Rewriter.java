@@ -11,29 +11,13 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.RecordComponentVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TypeInsnNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
-import org.objectweb.asm.tree.analysis.AnalyzerException;
-import org.objectweb.asm.tree.analysis.Interpreter;
-import org.objectweb.asm.tree.analysis.SourceInterpreter;
-import org.objectweb.asm.tree.analysis.SourceValue;
-import org.objectweb.asm.tree.analysis.Value;
 
 import java.io.IOException;
-import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -46,17 +30,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.objectweb.asm.Opcodes.*;
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ARETURN;
 import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.ASTORE;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 import static org.objectweb.asm.Opcodes.DUP;
-import static org.objectweb.asm.Opcodes.DUP_X1;
 import static org.objectweb.asm.Opcodes.GETFIELD;
-import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
@@ -65,19 +46,23 @@ import static org.objectweb.asm.Opcodes.POP;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 
-public class Rewriter {
-  enum TypeKind {
+public final class Rewriter {
+  private Rewriter() {
+    throw new AssertionError();
+  }
+
+  private enum TypeKind {
     IDENTITY, VALUE, ZERO_DEFAULT;
 
     TypeKind max(TypeKind kind) {
       return compareTo(kind) > 0 ? this: kind;
     }
   }
-  enum NullKind { NONNULL, NULLABLE }
+  private enum NullKind { NONNULL, NULLABLE }
 
-  record ClassData(String internalName, String superName, TypeKind typeKind, Set<String> dependencies, Map<String,FieldData> fieldDataMap, Map<String,MethodData> methodDataMap) { }
-  record FieldData(NullKind nullKind) {}
-  record MethodData(Map<Integer, NullKind> parameterMap) {}
+  private record ClassData(String internalName, String superName, TypeKind typeKind, Set<String> dependencies, Map<String,FieldData> fieldDataMap, Map<String,MethodData> methodDataMap) { }
+  private record FieldData(NullKind nullKind) {}
+  private record MethodData(Map<Integer, NullKind> parameterMap) {}
 
 
   private record Analysis(Map<String,ClassData> classDataMap) {
@@ -109,15 +94,11 @@ public class Rewriter {
   private static final int WITHFIELD = 204; // visitFieldInsn
 
   private static final class PreloadAttribute extends Attribute {
-    public List<String> classes ;
+    private final List<String> classes ;
 
-    public PreloadAttribute(List<String> classes) {
+    PreloadAttribute(List<String> classes) {
       super("Preload");
       this.classes = classes;
-    }
-
-    public PreloadAttribute() {
-      this(null);
     }
 
     @Override
@@ -185,15 +166,11 @@ public class Rewriter {
       @Override
       public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
         // System.out.println("class.visitAnnotation: descriptor = " + descriptor);
-        switch (descriptor) {
-          case "Lcom/github/forax/civilizer/runtime/Value;" -> {
-            typeKind = typeKind.max(TypeKind.VALUE);
-          }
-          case "Lcom/github/forax/civilizer/runtime/ZeroDefault;" -> {
-            typeKind = typeKind.max(TypeKind.ZERO_DEFAULT);
-          }
-          default -> {}
-        }
+        typeKind = typeKind.max(switch (descriptor) {
+          case "Lcom/github/forax/civilizer/runtime/Value;" -> TypeKind.VALUE;
+          case "Lcom/github/forax/civilizer/runtime/ZeroDefault;" -> TypeKind.ZERO_DEFAULT;
+          default -> TypeKind.IDENTITY;
+        });
         return null;
       }
 
@@ -291,12 +268,12 @@ public class Rewriter {
           @Override
           public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             var kind = classData.typeKind;
-            switch (kind) {
-              case IDENTITY -> {}
-              case VALUE -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE;
-              case ZERO_DEFAULT -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
-            }
-            super.visit(version, access, name, signature, superName, interfaces);
+            var classAccess = switch (kind) {
+              case IDENTITY -> access;
+              case VALUE -> (access & ~ ACC_IDENTITY) | ACC_VALUE;
+              case ZERO_DEFAULT -> (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
+            };
+            super.visit(version, classAccess, name, signature, superName, interfaces);
           }
 
           @Override
@@ -332,8 +309,8 @@ public class Rewriter {
             mv = fieldAccessAdapter(classDataMap, mv);
             mv = recordObjectMethodsAdapter(classData, mv);
             if (rewriteConstructor) {
-              var _this = Arrays.stream(Type.getArgumentTypes(methodDescriptor)).mapToInt(Type::getSize).sum();
-              mv = initToFactoryAdapter(classData.internalName, classData.superName, classDataMap, _this, mv);
+              var thisSlot = Arrays.stream(Type.getArgumentTypes(methodDescriptor)).mapToInt(Type::getSize).sum();
+              mv = initToFactoryAdapter(classData.internalName, classData.superName, classDataMap, thisSlot, mv);
             }
             return mv;
           }
@@ -341,12 +318,12 @@ public class Rewriter {
           @Override
           public void visitInnerClass(String name, String outerName, String innerName, int access) {
             var typeKind = Optional.ofNullable(classDataMap.get(name)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
-            switch (typeKind) {
-              case IDENTITY -> access |= ACC_IDENTITY;
-              case VALUE -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE;
-              case ZERO_DEFAULT -> access = (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
-            }
-            super.visitInnerClass(name, outerName, innerName, access);
+            var innerAccess = switch (typeKind) {
+              case IDENTITY -> access | ACC_IDENTITY;
+              case VALUE -> (access & ~ ACC_IDENTITY) | ACC_VALUE;
+              case ZERO_DEFAULT -> (access & ~ ACC_IDENTITY) | ACC_VALUE | ACC_PRIMITIVE;
+            };
+            super.visitInnerClass(name, outerName, innerName, innerAccess);
           }
 
           @Override
@@ -604,7 +581,7 @@ public class Rewriter {
     }
   }*/
 
-  private static MethodVisitor initToFactoryAdapter(String internalName, String superName, Map<String, ClassData> classDataMap, int _this, MethodVisitor mv) {
+  private static MethodVisitor initToFactoryAdapter(String internalName, String superName, Map<String, ClassData> classDataMap, int thisSlot, MethodVisitor mv) {
     return new MethodVisitor(ASM9, mv) {
       private boolean firstALOAD0 = true;
 
@@ -615,7 +592,7 @@ public class Rewriter {
             firstALOAD0 = false;
             return;
           }
-          super.visitVarInsn(ALOAD, _this);
+          super.visitVarInsn(ALOAD, thisSlot);
           return;
         }
         super.visitVarInsn(opcode, varIndex - 1);
@@ -626,13 +603,13 @@ public class Rewriter {
         if (opcode == INVOKESPECIAL && name.equals("<init>")) {
           if (owner.equals(superName) && descriptor.equals("()V")) {  // super()
             mv.visitTypeInsn(ACONST_INIT, internalName);
-            mv.visitVarInsn(ASTORE, _this);
+            mv.visitVarInsn(ASTORE, thisSlot);
             return;
           }
           if (owner.equals(internalName)) { // this(...)
             //TODO does not work if this(...) contains a new ont itself !
             mv.visitMethodInsn(INVOKESTATIC, internalName, "<vnew>", descriptor.substring(0, descriptor.length() - 1) + "L" + internalName + ";", false);
-            mv.visitVarInsn(ASTORE, _this);
+            mv.visitVarInsn(ASTORE, thisSlot);
             return;
           }
         }
@@ -651,7 +628,7 @@ public class Rewriter {
             }
           }
           mv.visitFieldInsn(WITHFIELD, owner, name, descriptor);
-          mv.visitVarInsn(ASTORE, _this);
+          mv.visitVarInsn(ASTORE, thisSlot);
           return;
         }
         super.visitFieldInsn(opcode, owner, name, descriptor);
@@ -660,7 +637,7 @@ public class Rewriter {
       @Override
       public void visitInsn(int opcode) {
         if (opcode == RETURN) {
-          mv.visitVarInsn(ALOAD, _this);
+          mv.visitVarInsn(ALOAD, thisSlot);
           mv.visitInsn(ARETURN);
           return;
         }
