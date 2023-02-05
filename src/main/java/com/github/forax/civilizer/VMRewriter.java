@@ -60,6 +60,47 @@ import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 
+/*
+ This rewriter works in two passes on the whole Java classes and uses close world assumption
+ The first pass goes through all final static fields typed String starts with "$P", all the annotations
+  @Parametric and @TypeRestrictions and record the resulting info in the Analysis class.
+  The second pass rewrite the bytecode using the Analysis information.
+
+  Analysis Pass:
+  - gather the restriction for fields (ClassData.fieldRestrictionMap) and methods (ClassData.methodRestrictionMap)
+  - gather the anchors from the annotations @Parametric
+    - store the parametric classes (ClassData.parametric)
+    - store the parametric methods (ClassData.methodParametricSet)
+  - for each constant $P, find the root i.e. the anchor which the values of the constant depend on.
+    If there are more than one anchor, report an error
+    If there are no anchor, it's a constant pool constant for all species, that should be stored in the
+    classical constant pool
+  - mark all constants depending on an anchor + the constant bootstrap methods referenced by @Parametric,
+    as requiring an accessor at runtime (ClassData.condyFieldAccessors)
+  - for all constants, create the corresponding tree of constant dynamics and record if the constant
+    should be stored in a kiddy pool or not (ClassData.condyMap)
+
+  Rewriting Pass:
+   - Parametric constructors/methods takes a supplementary Object parameter at the end, to be binary backward compatible,
+     a variant without the Object is added and delegates to the parametric method with a raw kiddy pool
+     (a kiddy pool with the parameters set to null)
+   - Parametric constructor initialize an instance field $kiddyPool.
+   - String constant + calls to .intern() stores the constant as constant pool/kiddy pool constant
+   - the opcodes NEW+INNVOKESPECIAL, INVOKEVIRTUAL, INVOKSTATIC and ANEWARRAY are rewritten as invoke dynamic
+     that take the constant pool/kiddy pool constant.
+     - the constant pool constant is a constant dynamic if the constant is a constant pool constant
+     - the constant pool constant is a string reference to a kiddy pool constant
+       the invoke dynamic method takes a supplementary parameter (the kiddy pool class).
+       - The kiddy pool class is passed as the last parameter of invoke dynamic (see loadKiddyPool)
+         - inside an instance method, the kiddy pool class is stored as an instance field $kiddyPool
+         - inside a parametric static method, the kiddy pool class is the last parameter
+   - TypeRestricted (not final) fields are initialized to their default value in the constructor,
+     and putValue on a TypeRestricted field checks the value with MethodHandle.asType()
+   - TypeRestricted method starts with a prolog that to a call that checks the arguments, with MethodHandle.asType()
+
+   All the creation of the kiddy pool classes, all the type checking of the TypeRestrictions are deferred at runtime,
+   see RT.
+ */
 public final class VMRewriter {
   private VMRewriter() {
     throw new AssertionError();
