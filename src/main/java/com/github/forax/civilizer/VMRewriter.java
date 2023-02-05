@@ -60,10 +60,14 @@ import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 
-public class VMRewriter {
-  record Field(String name, String descriptor) {}
-  record Method(String name, String descriptor) {}
-  record FieldRestriction(int access, String constant) {}
+public final class VMRewriter {
+  private VMRewriter() {
+    throw new AssertionError();
+  }
+
+  private record Field(String name, String descriptor) {}
+  private record Method(String name, String descriptor) {}
+  private record FieldRestriction(int access, String constant) {}
   enum AnchorKind {
     ClASS, METHOD;
 
@@ -71,15 +75,15 @@ public class VMRewriter {
       return name().toLowerCase(Locale.ROOT);
     }
   }
-  record CondyInfo(boolean inKiddyPool, ConstantDynamic constantDynamic) {}
-  record ClassData(String internalName,
+  private record CondyInfo(boolean inKiddyPool, ConstantDynamic constantDynamic) {}
+  private record ClassData(String internalName,
                    boolean parametric,
                    HashMap<String, CondyInfo> condyMap,
                    HashSet<String> condyFieldAccessors,
                    LinkedHashMap<Field,FieldRestriction> fieldRestrictionMap,
                    HashSet<Method> methodParametricSet,
                    HashMap<Method, String> methodRestrictionMap) {}
-  record Analysis(HashMap<String,ClassData> classDataMap) {
+  private record Analysis(HashMap<String,ClassData> classDataMap) {
     void dump() {
       for(var classData: classDataMap.values()) {
         System.out.println("class " + classData.internalName);
@@ -89,13 +93,13 @@ public class VMRewriter {
   }
 
   private static final class RewriterException extends RuntimeException {
-    public RewriterException(String message) {
+    RewriterException(String message) {
       super(message);
     }
-    public RewriterException(String message, Throwable cause) {
+    RewriterException(String message, Throwable cause) {
       super(message, cause);
     }
-    public RewriterException(Throwable cause) {
+    RewriterException(Throwable cause) {
       super(cause);
     }
   }
@@ -316,15 +320,15 @@ public class VMRewriter {
         }
         var anchorKind = anchorMap.get(reference.getName());
         if (anchorKind == null) {
-          throw new RewriterException("constant " + condyName + ", anchor reference " + reference + "is not referenced by @Parametric");
+          throw new RewriterException("constant " + condyName + ", anchor reference " + reference + " is not referenced by @Parametric");
         }
         return List.of(anchorKind.text());
       }
 
-      record RootInfo(String condyName, RootKind kind) {
+      private record RootInfo(String condyName, RootKind kind) {
         enum RootKind { ANCHOR, CONST }
 
-        public RootInfo merge(RootInfo root, ProtoCondy protoCondy) {
+        RootInfo merge(RootInfo root, ProtoCondy protoCondy) {
           return switch (kind) {
             case ANCHOR -> switch (root.kind) {
               case ANCHOR -> throw new RewriterException("constant " + protoCondy.condyName + " depends on two anchors " + this +  " " + root);
@@ -654,7 +658,7 @@ public class VMRewriter {
             var parametricOwner = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
             var parametricCall = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(cd -> cd.methodParametricSet.contains(new Method(name, descriptor))).orElse(false);
 
-            if ((parametricOwner || parametricCall) & isInterface) {
+            if ((parametricOwner || parametricCall) && isInterface) {
               throw new RewriterException("parametric call to interfaces is not supported");
             }
 

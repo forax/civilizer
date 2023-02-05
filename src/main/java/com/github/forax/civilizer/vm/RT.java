@@ -37,7 +37,7 @@ import static org.objectweb.asm.Opcodes.ACC_SUPER;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.ASM9;
 
-public class RT {
+public final class RT {
   private RT() {
     throw new AssertionError();
   }
@@ -124,19 +124,24 @@ public class RT {
     try {
        return MethodHandles.privateLookupIn(raw, lookup);
     } catch (IllegalAccessException e) {
-      throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+      throw (IllegalAccessError) new IllegalAccessError("class " + lookup.lookupClass().getName() + " can not access to class " + raw.getName()).initCause(e);
     }
   }
 
   private static Object callBSM(Lookup speciesLookup, Species species, String bsmPoolRef, Object parameters) {
+    MethodHandle bsmPool;
     try {
-      var bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+      bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+    } catch(NoSuchMethodException | IllegalAccessException e) {
+      throw new LinkageError("constant pool constant $" + bsmPoolRef, e);
+    }
+    try {
       var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
       return bsm.invoke(parameters);
     } catch (Error e) {
       throw e;
     } catch(Throwable e) {
-      throw (LinkageError) new LinkageError().initCause(e);
+      throw new LinkageError("error while calling the bootstrap method of $" + bsmPoolRef, e);
     }
   }
 
@@ -191,6 +196,7 @@ public class RT {
     private final BSM bsm;
     private final String kiddyPoolRef;
 
+    @SuppressWarnings("ThisEscapedInObjectConstruction")
     private KiddyPoolRefInliningCache(MethodType type, Lookup lookup, String kiddyPoolRef, BSM bsm) {
       super(type);
       this.lookup = lookup;
@@ -239,6 +245,7 @@ public class RT {
     private final Lookup lookup;
     private final BSM bsm;
 
+    @SuppressWarnings("ThisEscapedInObjectConstruction")
     private VirtualCallInliningCache(MethodType type, Lookup lookup, BSM bsm) {
       super(type);
       this.lookup = lookup;
@@ -294,7 +301,7 @@ public class RT {
     //System.out.println("bsm_virtual " + name + type + " " + constant);
 
     if (constant instanceof Linkage linkage) {
-      // the instance method is parametrized ?
+      // is the instance method parametrized ?
       if (linkage.parameters() != null) {
         // an inlining cache for the receiver
         return new VirtualCallInliningCache(type, lookup,
@@ -306,8 +313,6 @@ public class RT {
                 var kiddyPoolRef = parametric.value();
                 var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, kiddyPoolRef,
                     classParameters -> {
-
-
                       // call the de-virtualized method with a kiddy pool created with the pair (species parameter + method parameter)
                       var species = new Species(receiverClass, classParameters);
                       var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
