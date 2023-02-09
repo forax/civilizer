@@ -2,8 +2,7 @@ package com.github.forax.civilizer.species;
 
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
-import com.github.forax.civilizer.vm.Species;
-import org.junit.jupiter.api.Disabled;
+import com.github.forax.civilizer.vm.SuperType;
 import org.junit.jupiter.api.Test;
 
 import java.util.function.Function;
@@ -41,7 +40,7 @@ public class InheritanceTest {
   }
 
   @Test
-  public void test() {
+  public void testHolder() {
     class StringTest {
       private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
@@ -67,4 +66,31 @@ public class InheritanceTest {
 
     StringTest.test();
   }
+
+  /*@Parametric("P0")
+  interface ParametricInterface<T> {
+    String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    String $P1 = "anchor P0;";
+    String $P2 = "list.get P1; 0";
+
+    default Object dump() {
+      "P2".intern();
+      return RT.ldc();
+    }
+  }
+
+  @SuperType("P2")
+  @Parametric("P3")
+  class AClass implements ParametricInterface<String> {
+    private static final String $P0 = "list Ljava/lang/String;";
+    private static final String $P1 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface P0;";
+    private static final String $P2 = "super P1;";
+    private static final String $P3 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+  }
+
+  @Test
+  public void testDefaultMethod() {
+    var aClass = new AClass();
+    assertEquals(String.class, aClass.dump());
+  }*/
 }

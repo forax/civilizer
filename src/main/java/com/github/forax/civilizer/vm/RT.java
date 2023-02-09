@@ -146,17 +146,53 @@ public final class RT {
   }
 
   private static Class<?> kiddyPoolClass(Lookup lookup, Species species) {
-    var parametric = species.raw().getAnnotation(Parametric.class);
+    Class<?> speciesRaw = species.raw();
+    var parametric = speciesRaw.getAnnotation(Parametric.class);
     if (parametric == null) {
-      throw new LinkageError(species.raw() + " is not declared parametric");
+      throw new LinkageError(speciesRaw + " is not declared parametric");
     }
-    var speciesLookup = privateSpeciesLookup(lookup, species.raw());
+    var speciesLookup = privateSpeciesLookup(lookup, speciesRaw);
     var bsmPoolRef = parametric.value();
     var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
-    var keySpecies = new Species(species.raw(), parameters);
-    return KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
+    var keySpecies = new Species(speciesRaw, parameters);
+    var kiddyPoolClass =  KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
         sp -> createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null)));
+    if (speciesRaw.isAnnotationPresent(SuperType.class)) {
+      SUPER_KIDDY_POOLS.get(kiddyPoolClass);
+    }
+    return kiddyPoolClass;
   }
+
+  private static final ClassValue<HashMap<Class<?>, Class<?>>> SUPER_KIDDY_POOLS = new ClassValue<>() {
+    @Override
+    protected HashMap<Class<?>, Class<?>> computeValue(Class<?> type) {
+      var nestHost = type.getNestHost();
+      var superType = nestHost.getAnnotation(SuperType.class);
+      var superRef = superType.value();
+      var speciesLookup = privateSpeciesLookup(MethodHandles.lookup(), type);
+      MethodHandle accessor;
+      try {
+        accessor = speciesLookup.findStatic(type, "$" + superRef, methodType(Object.class));
+      } catch (NoSuchMethodException e) {
+        throw (NoSuchMethodError) new NoSuchMethodError().initCause(e);
+      } catch (IllegalAccessException e) {
+        throw (IllegalAccessError) new IllegalAccessError().initCause(e);
+      }
+      Super zuper = null;
+      try {
+        zuper = (Super) (Object) accessor.invokeExact();
+      } catch(Error e) {
+        throw e;
+      } catch (Throwable e) {
+        throw new LinkageError("error while accessing super " + superRef, e);
+      }
+      var superMap = new HashMap<Class<?>, Class<?>>();
+      for(var superSpecies: zuper.species()) {
+        superMap.put(superSpecies.raw(), kiddyPoolClass(speciesLookup, superSpecies));
+      }
+      return superMap;
+    }
+  };
 
   private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) {
     var mhInfo = lookup.revealDirect(method);
@@ -487,6 +523,7 @@ public final class RT {
             lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]),
             1, Arrays.stream(args).skip(3).toArray());
       case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
+      case "super" -> new Super(Arrays.stream(args).map(o -> (Species) o).toList());
       default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
     };
   }
@@ -505,5 +542,22 @@ public final class RT {
     var species = new Species(lookup.lookupClass(), null);
     var methodSpecies = new MethodSpecies(species, methodInfo.getName(), methodInfo.getMethodType().toMethodDescriptorString(), null);
     return kiddyPoolClass(lookup, methodSpecies, method);
+  }
+
+  @SuppressWarnings("unused") // used by reflection
+  public static CallSite bsm_interface_kiddy_pool(Lookup lookup, String name, MethodType type) {
+    System.out.println("bsm_interface_kiddy_pool " + lookup + " " + name + " " + type);
+
+    var interfaceType = type.parameterType(0);
+    return new VirtualCallInliningCache(type, lookup,
+        receiverClass -> {
+           //FIXME, check if the receiver class is Parametric
+
+           var receiverLookup = privateSpeciesLookup(lookup, receiverClass);
+           receiverLookup.findStatic(receiverClass, "$kiddyPool", methodType(Object.class));
+
+           //SUPER_KIDDY_POOLS.get();
+          throw new UnsupportedOperationException("NYI");
+        });
   }
 }

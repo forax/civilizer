@@ -179,6 +179,10 @@ public final class VMRewriter {
       "bsm_raw_method_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/invoke/MethodHandle;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_INTERFACE_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_interface_kiddy_pool",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
+      false);
   private static final Handle BSM_TYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_type",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
