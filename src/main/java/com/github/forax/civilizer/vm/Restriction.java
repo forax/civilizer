@@ -1,7 +1,8 @@
 package com.github.forax.civilizer.vm;
 
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 public record Restriction(List<Class<?>> types) {
   public Restriction {
@@ -12,6 +13,6 @@ public record Restriction(List<Class<?>> types) {
   public String toString() {
     return types.stream()
         .map(Class::getSimpleName)
-        .collect(Collectors.joining(" ", "Restriction ", ""));
+        .collect(joining(" ", "Restriction ", ""));
   }
 }
