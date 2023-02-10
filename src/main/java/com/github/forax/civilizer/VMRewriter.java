@@ -72,10 +72,20 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
   - gather the anchors from the annotations @Parametric
     - store the parametric classes (ClassData.parametric)
     - store the parametric methods (ClassData.methodParametricSet)
-  - for each constant $P, find the root i.e. the anchor which the values of the constant depend on.
-    If there are more than one anchor, report an error
-    If there are no anchor, it's a constant pool constant for all species, that should be stored in the
-    classical constant pool
+  - for each constant $P,
+     if it's an anchor/parameter create a root with the name (and the parent name if it exists)
+     otherwise
+       if there is no dependency it's a constant (const),
+       for each dependency, find the corresponding root and reduce the roots with
+         RootInfo.merge(root, root2):
+           const, const -> const
+           const, anchor -> anchor
+           anchor, const -> anchor
+           anchor(name, parent), anchor2(name2, parent2) ->
+             name == name2 -> anchor
+             name == parent2.name -> name
+             parent.name == name2 -> anchor2
+
   - mark all constants depending on an anchor + the constant bootstrap methods referenced by @Parametric,
     as requiring an accessor at runtime (ClassData.condyFieldAccessors)
   - for all constants, create the corresponding tree of constant dynamics and record if the constant
