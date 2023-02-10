@@ -95,7 +95,7 @@ public final class RT {
 
       @Override
       public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_SYNTHETIC) != 0 && name.startsWith("$P")) {
+        if ((access & ACC_SYNTHETIC) != 0 && (name.startsWith("$P") || name.equals("$classData"))) {
           return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
         return null;
@@ -346,10 +346,11 @@ public final class RT {
               var parametric = receiverClass.getAnnotation(Parametric.class);
               var speciesLookup = privateSpeciesLookup(lookup, receiverClass);
               if (parametric != null) {
-                // an inlining cache for the kiddyPool anchor constant pool ref
-                var kiddyPoolRef = parametric.value();
-                var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, kiddyPoolRef,
-                    classParameters -> {
+                // an inlining cache for the kiddyPool $classData constant pool ref
+                var inliningCache = new KiddyPoolRefInliningCache(type.appendParameterTypes(Object.class), speciesLookup, "classData",
+                    anchor -> {
+                      var classParameters = ((Anchor) anchor).classParameters;
+
                       // call the de-virtualized method with a kiddy pool created with the pair (species parameter + method parameter)
                       var species = new Species(receiverClass, classParameters);
                       var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
@@ -502,30 +503,34 @@ public final class RT {
 
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
-    //System.out.println("bsm_condy " + action + " " + Arrays.toString(args));
+    System.err.println("bsm_condy " + name + " " + action + " " + Arrays.toString(args));
 
-    return switch (action) {
-      case "anchor" -> {
-        var anchor = (Anchor) MethodHandles.classData(lookup, "_", Object.class);
-        yield switch (args[0].toString()) {
-          case "class" -> anchor.classParameters;
-          case "method" -> anchor.methodParameters;
-          default -> throw new AssertionError("unknown kind " + args[0]);
-        };
-      }
-      case "list" -> List.of(args);
-      case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
-      case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
-      case "species.raw" -> ((Species) args[0]).raw();
-      case "species.parameters" -> ((Species) args[0]).parameters();
-      case "linkage" -> new Linkage(args[0]);
-      case "mh" -> insertArguments(
-            lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]),
-            1, Arrays.stream(args).skip(3).toArray());
-      case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
-      case "super" -> new Super(Arrays.stream(args).map(o -> (Species) o).toList());
-      default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
-    };
+    try {
+      return switch (action) {
+        case "anchor" -> {
+          var anchor = (Anchor) MethodHandles.classData(lookup, "_", Object.class);
+          yield switch (args[0].toString()) {
+            case "class" -> anchor.classParameters;
+            case "method" -> anchor.methodParameters;
+            default -> throw new AssertionError("unknown kind " + args[0]);
+          };
+        }
+        case "list" -> List.of(args);
+        case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
+        case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);
+        case "species.raw" -> ((Species) args[0]).raw();
+        case "species.parameters" -> ((Species) args[0]).parameters();
+        case "linkage" -> new Linkage(args[0]);
+        case "mh" -> insertArguments(
+              lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]),
+              1, Arrays.stream(args).skip(3).toArray());
+        case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
+        case "super" -> new Super(Arrays.stream(args).map(o -> (Species) o).toList());
+        default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
+      };
+    } catch(RuntimeException e) {
+      throw new LinkageError("runtime error while computing constant " + name + ": " + action + " " + Arrays.toString(args), e);
+    }
   }
 
   @SuppressWarnings("unused") // used by reflection

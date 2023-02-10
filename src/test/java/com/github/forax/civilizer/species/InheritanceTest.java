@@ -5,6 +5,7 @@ import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.SuperType;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -65,6 +66,63 @@ public class InheritanceTest {
     }
 
     StringTest.test();
+  }
+
+  @Parametric("P0")
+  static class Pair<T, U> {
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+
+    private static final String $PA_0 = "anchor P0;";
+    private static final String $PA_1 = "list.get PA_0; 0";
+    private static final String $PA_2 = "list.get PA_0; 1";
+    private static final String $PB_0 = "anchor P1; PA_0;";
+    private static final String $PB_1 = "list.get PB_0; 0";
+    private static final String $PB_2 = "list PA_1; PB_1;";
+    private static final String $PB_3 = "linkage PB_2;";
+
+    private List<Object> debug() {
+      "PA_1".intern();
+      var first = RT.ldc();
+
+      "PA_2".intern();
+      var second = RT.ldc();
+
+      return List.of(first, second);
+    }
+
+    @Parametric("P1")
+    <V> Pair<T, V> replaceSecond() {
+      "PB_3".intern();
+      return new Pair<>();
+    }
+  }
+
+  @Test
+  public void testPair() {
+    class PairTest {
+      private static final String $P0 = "list Ljava/lang/String; Ljava/lang/Integer;";
+      private static final String $P1 = "linkage P0;";
+      private static final String $P2 = "list Ljava/lang/Double;";
+      private static final String $P3 = "linkage P2;";
+
+      public static void test() {
+        "P1".intern();
+        var pair = new Pair<String, Integer>();
+
+        "P3".intern();
+        var pair2 = pair.<Double>replaceSecond();
+
+        assertAll(
+            () -> assertEquals(String.class, pair.debug().get(0)),
+            () -> assertEquals(Integer.class, pair.debug().get(1)),
+            () -> assertEquals(String.class, pair2.debug().get(0)),
+            () -> assertEquals(Double.class, pair2.debug().get(1))
+        );
+      }
+    }
+
+    PairTest.test();
   }
 
   /*@Parametric("P0")

@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -179,6 +180,10 @@ public final class VMRewriter {
       "bsm_raw_method_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/invoke/MethodHandle;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_CLASS_DATA = new Handle(H_INVOKESTATIC, MethodHandles.class.getName().replace('.', '/'),
+      "classData",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+      false);
   private static final Handle BSM_INTERFACE_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_interface_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
@@ -195,7 +200,7 @@ public final class VMRewriter {
   private static ClassData analyze(byte[] buffer) {
     record ProtoCondy(String condyName, String action, List<String> args) {}
 
-    var anchorMap = new HashMap<String, AnchorKind>();
+    var anchorKindMap = new HashMap<String, AnchorKind>();
     var protoCondies = new ArrayList<ProtoCondy>();
     var condyMap = new LinkedHashMap<String, CondyInfo>();
     var condyFieldAccessors = new HashSet<String> ();
@@ -224,7 +229,7 @@ public final class VMRewriter {
               throw new AssertionError("Parametric is malformed !");
             }
             if (!"".equals(constant)) {
-              anchorMap.merge(constant, anchorKind, (k1, k2) -> {
+              anchorKindMap.merge(constant, anchorKind, (k1, k2) -> {
                 if (k1 != k2) {
                   throw new RewriterException("anchor " + constant + " defined as both a class and a method anchor");
                 }
@@ -331,7 +336,7 @@ public final class VMRewriter {
           var action = protoCondy.action;
           var protoArgs = protoCondy.args;
           var args = action.equals("anchor") ?
-              decodeAnchorAction(condyName, protoArgs) :
+              List.of(decodeAnchorAction(condyName, protoArgs).text()) :
               protoArgs.stream().map(this::condyArgument).toList();
           var bsmConstants = Stream.concat(Stream.of(action), args.stream()).toArray();
           var constantDynamic = new ConstantDynamic(condyName, "Ljava/lang/Object;", BSM_CONDY, bsmConstants);
@@ -341,28 +346,37 @@ public final class VMRewriter {
         }
       }
 
-      private List<Object> decodeAnchorAction(String condyName, List<String> args) {
-        if (args.size() != 1) {
-          throw new RewriterException("anchor should have an argument " + condyName);
-        }
+      private AnchorKind decodeAnchorAction(String condyName, List<String> args) {
+        assert args.size() < 1 || args.size() > 2;
         var argument = condyArgument(args.get(0));
-        if (!(argument instanceof ConstantDynamic reference)) {
+        if (!(argument instanceof ConstantDynamic reference)) {  // FIXME, it can be a reference to the parent kiddy pool
           throw new RewriterException("anchor argument is not a reference to a constant " + condyName);
         }
-        var anchorKind = anchorMap.get(reference.getName());
+        var anchorKind = anchorKindMap.get(reference.getName());
         if (anchorKind == null) {
           throw new RewriterException("constant " + condyName + ", anchor reference " + reference + " is not referenced by @Parametric");
         }
-        return List.of(anchorKind.text());
+        return anchorKind;
       }
 
-      private record RootInfo(String condyName, RootKind kind) {
+
+
+      private record RootInfo(RootKind kind, String name, String parentName) {
         private enum RootKind { ANCHOR, CONST }
 
         RootInfo merge(RootInfo root, ProtoCondy protoCondy) {
           return switch (kind) {
             case ANCHOR -> switch (root.kind) {
-              case ANCHOR -> throw new RewriterException("constant " + protoCondy.condyName + " depends on two anchors " + this +  " " + root);
+              case ANCHOR -> {
+                if (name.equals(root.name) || parentName.equals(root.name)) {
+                  yield this;
+                }
+                if (name.equals(root.parentName)) {
+                  yield root;
+                }
+                throw new RewriterException("constant " + protoCondy.condyName + " depends on two anchors " + name +  " and " + root.name +
+                    " and one is not parent of the other");
+              }
               case CONST -> this;
             };
             case CONST -> switch (root.kind) {
@@ -373,6 +387,31 @@ public final class VMRewriter {
         }
       }
 
+      private static RootInfo anchorRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap) {
+        if (protoCondy.args.size() < 1 || protoCondy.args.size() > 2) {
+          throw new RewriterException("anchor " + protoCondy.condyName + " has not the right number of arguments");
+        }
+        String parentName;
+        if (protoCondy.args.size() == 2) {  // a parent root is specified
+          var parentArg = protoCondy.args.get(1);
+          if (!parentArg.endsWith(";") || !parentArg.startsWith("P")) {
+            throw new RewriterException("parent ref of anchor " + protoCondy.condyName + " is not a reference");
+          }
+          var parentRef = parentArg.substring(0, parentArg.length() - 1);
+          var parent = protoCondyMap.get(parentRef);
+          if (parent == null) {
+            throw new RewriterException("unknown reference to parent anchor " + parentRef + " when parsing constant " + protoCondy.condyName);
+          }
+          if (!parent.action.equals("anchor")) {
+            throw new RewriterException("parent anchor " + parentRef + " of " + protoCondy.condyName + " does not reference an anchor");
+          }
+          parentName = parent.condyName;
+        } else {
+          parentName = "";    // no parent
+        }
+        return new RootInfo(RootInfo.RootKind.ANCHOR, protoCondy.condyName, parentName);
+      }
+
       private static RootInfo findRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap, LinkedHashMap<ProtoCondy, RootInfo> rootMap) {
         var cachedRoot = rootMap.get(protoCondy);
         if (cachedRoot != null) {
@@ -380,14 +419,14 @@ public final class VMRewriter {
         }
         // an anchor is a root
         if (protoCondy.action.equals("anchor")) {
-          var root = new RootInfo(protoCondy.condyName, RootInfo.RootKind.ANCHOR);
+          var root =  anchorRoot(protoCondy, protoCondyMap);
           rootMap.put(protoCondy, root);
           return root;
         }
         var root = (RootInfo) null;
         for(var arg: protoCondy.args) {
           // dependency ?
-          if (arg.endsWith(";") && (arg.startsWith("P") || arg.startsWith("KP"))) {
+          if (arg.endsWith(";") && arg.startsWith("P")) {
             var dependencyRef = arg.substring(0, arg.length() - 1);
             var dependency = protoCondyMap.get(dependencyRef);
             if (dependency == null) {
@@ -402,7 +441,7 @@ public final class VMRewriter {
           }
         }
         if (root == null) {
-          root = new RootInfo(protoCondy.condyName, RootInfo.RootKind.CONST);
+          root = new RootInfo(RootInfo.RootKind.CONST, protoCondy.condyName, "");
         }
         rootMap.put(protoCondy, root);
         return root;
@@ -417,7 +456,7 @@ public final class VMRewriter {
         }
         System.out.println("  dependencies:");
         for(var dependencyEntry: dependencyMap.entrySet()) {
-          System.out.println("    anchor " + dependencyEntry.getKey().condyName + ": " + dependencyEntry.getValue().stream().map(ProtoCondy::condyName).collect(joining(", ")));
+          System.out.println("    anchor " + dependencyEntry.getKey().name + ": " + dependencyEntry.getValue().stream().map(ProtoCondy::condyName).collect(joining(", ")));
         }
       }
 
@@ -486,7 +525,7 @@ public final class VMRewriter {
           var condyInfo = findCondyInfo(condyName);
           if (classData.condyFieldAccessors.contains(name)) {
             // we need accessors for the constant dynamic referenced from outside
-            var mv = cv.visitMethod(ACC_STATIC | ACC_SYNTHETIC | ACC_PRIVATE, name, "()Ljava/lang/Object;", null, null);
+            var mv = cv.visitMethod(ACC_STATIC | ACC_PRIVATE | ACC_SYNTHETIC, name, "()Ljava/lang/Object;", null, null);
             mv.visitCode();
             mv.visitLdcInsn(condyInfo.constantDynamic);
             mv.visitInsn(ARETURN);
@@ -801,6 +840,15 @@ public final class VMRewriter {
         if (classData.parametric) {  // parametric class
           var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
           fv.visitEnd();
+
+          if (!classData.methodParametricSet.isEmpty()) {  //FIXME better to check if there is an anchor with a parent anchor
+            var mv = cv.visitMethod(ACC_STATIC | ACC_PRIVATE | ACC_SYNTHETIC, "$classData", "()Ljava/lang/Object;", null, null);
+            mv.visitCode();
+            mv.visitLdcInsn(new ConstantDynamic("_", "Ljava/lang/Object;", BSM_CLASS_DATA));
+            mv.visitInsn(ARETURN);
+            mv.visitMaxs(1, 0);
+            mv.visitEnd();
+          }
         }
         super.visitEnd();
       }
