@@ -40,7 +40,7 @@ Otherwise, a value type (zero-default or not) works like any object.
 ```
 
 Compared to a classical @NonNull, this one has some teeth, when declared on a parameter of a method, a nullcheck is done at each call. When declared on a field only non-null zero-default is enforced (because in the other case null is a valid default value when the field is not yet initialized).
-This behavior is i believe the same as in Kotlin.
+This behavior is I believe the same as in Kotlin.
 
 
 ## VMRewriter
@@ -50,12 +50,16 @@ This rewriter allows to declare new constant pool constants (that starts with `$
 To specify a new constant, the rewriter recognize `static final String` that starts with `$P` and
 transforms them to constant (constant dynamic constant).
 Each constant is initialized with a kind of LISP (condy-LISP) that recognizes the instructions:
-- `list` &lt;args&gt;... creates a list,
-- `list.get` &lt;list&gt; &lt;index&gt; extracts the nth item of a list,
 - `anchor` &lt;ref&gt; &lt;parent-ref?&gt;, parameters of the parametric class/method,
 - `linkage` &lt;ref&gt;  specifies a parameters of one of the parametrized opcodes,
+- `list` &lt;args&gt;... creates a list,
+- `list.get` &lt;list&gt; &lt;index&gt; extracts the nth item of a list,
+- `mh` &lt;class&gt; &lt;name&gt; &lt;descriptor&gt; &lt;constArgs...&gt; creates a method handle (the constant arguments are inserted at the end),
 - `restriction` &lt;refs...&gt;  specifies the classes of the method parameters/field type,
-- `mh` &lt;class&gt; &lt;name&gt; &lt;descriptor&gt; &lt;constArgs...&gt; creates a method handle (the constant arguments are inserted at the end).
+- `species` &lt;raw&gt; &lt;arg&gt; creates a species,
+- `species.raw` &lt;species&gt; returns the raw part of a species,
+- `species.parameters` &lt;species&gt; returns the parameters part of a species,
+- `super` &lt;species&gt;... specifies the parametrized supers interfaces.
 
 The atoms of a cody-LISP expression are
 - a primitive type (Z, B, C, S, I, J, F, D) or void (V),
