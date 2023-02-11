@@ -159,7 +159,7 @@ public final class RT {
     var kiddyPoolClass =  KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
         sp -> createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null)));
     if (speciesRaw.isAnnotationPresent(SuperType.class)) {
-      System.err.println("Super type " + speciesRaw.getAnnotation(SuperType.class));
+      //System.err.println("Super type " + speciesRaw.getAnnotation(SuperType.class));
       SUPER_SPECIES_MAP.get(kiddyPoolClass);
     }
     return kiddyPoolClass;
@@ -620,8 +620,16 @@ public final class RT {
   }
 
   @SuppressWarnings("unused") // used by reflection
+  public static CallSite bsm_super_kiddy_pool(Lookup lookup, String name, MethodType type) {
+    //System.out.println("bsm_super_kiddy_pool " + lookup + " " + name + " " + type);
+
+    var superclass = lookup.lookupClass().getSuperclass();
+    return new KiddyPoolSuperInliningCache(methodType(Object.class, Object.class), lookup, superclass);
+  }
+
+  @SuppressWarnings("unused") // used by reflection
   public static CallSite bsm_interface_kiddy_pool(Lookup lookup, String name, MethodType type) {
-    System.out.println("bsm_interface_kiddy_pool " + lookup + " " + name + " " + type);
+    //System.out.println("bsm_interface_kiddy_pool " + lookup + " " + name + " " + type);
 
     var rawSuper = lookup.lookupClass();
     return new VirtualCallInliningCache(type, lookup,

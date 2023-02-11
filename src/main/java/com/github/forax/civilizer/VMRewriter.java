@@ -199,6 +199,10 @@ public final class VMRewriter {
       "classData",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
+  private static final Handle BSM_SUPER_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_super_kiddy_pool",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
+      false);
   private static final Handle BSM_INTERFACE_KIDDY_POOL = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_interface_kiddy_pool",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
@@ -608,13 +612,25 @@ public final class VMRewriter {
             @Override
             public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
               if (opcode == INVOKESPECIAL && owner.equals(supername) && name.equals("<init>")) {
-                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                mv.visitVarInsn(ALOAD, 0);
                 var kiddyPoolSlot = Type.getArgumentsAndReturnSizes(methodDescriptor) >> 2;  // class is parametric
+                var superIsParametric = Optional.ofNullable(classDataMap.get(supername)).map(ClassData::parametric).orElse(false);
+                if (superIsParametric) {
+                  // we need to compute the kiddy pool of the super class
+                  mv.visitVarInsn(ALOAD, kiddyPoolSlot);
+                  mv.visitInvokeDynamicInsn("super", "(Ljava/lang/Object;)Ljava/lang/Object;", BSM_SUPER_KIDDY_POOL);
+                  var desc = MethodTypeDesc.ofDescriptor(descriptor);
+                  desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
+                  super.visitMethodInsn(opcode, owner, name, desc.descriptorString(), isInterface);
+                } else {
+                  super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                }
+
+                // init kiddy pool field
+                mv.visitVarInsn(ALOAD, 0);
                 mv.visitVarInsn(ALOAD, kiddyPoolSlot);
                 mv.visitFieldInsn(PUTFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
 
-                // init defaults
+                // init default values of fields depending on the type restrictions
                 for(var fieldEntry: classData.fieldRestrictionMap.entrySet()) {
                   var fieldRestriction = fieldEntry.getValue();
                   if ((fieldRestriction.access & ACC_FINAL) != 0) {

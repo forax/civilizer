@@ -214,4 +214,48 @@ public class InheritanceTest {
     var noArgument = new NoArgument();
     assertEquals(Object.class, noArgument.dump());
   }
+
+
+  @Parametric("P0")
+  static class BaseClass<T> {
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P1 = "anchor P0;";
+    private static final String $P2 = "list.get P1; 0";
+
+    Object dump() {
+      "P2".intern();
+      return RT.ldc();
+    }
+  }
+
+  @Parametric("P0")
+  @SuperType("P3")
+  static class SubType<T> extends BaseClass<T> {
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P1 = "anchor P0;";
+    private static final String $P2 = "species Lcom/github/forax/civilizer/species/InheritanceTest$BaseClass; P1;";
+    private static final String $P3 = "super P2;";
+  }
+
+  @Test
+  public void testInheritance() {
+    record Test() {
+      private static final String $P0 = "list Ljava/lang/String;";
+      private static final String $P1 = "linkage P0;";
+      private static final String $P2 = "list Ljava/lang/Double;";
+      private static final String $P3 = "linkage P2;";
+
+      static void test() {
+        "P1".intern();
+        BaseClass<String> baseClass = new SubType<String>();
+        assertEquals(String.class, baseClass.dump());
+
+        "P3".intern();
+        BaseClass<Double> baseClass2 = new SubType<Double>();
+        assertEquals(Double.class, baseClass2.dump());
+      }
+    }
+
+    Test.test();
+  }
 }
