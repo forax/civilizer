@@ -71,11 +71,14 @@ The atoms of a cody-LISP expression are
 - an integer, starts with a digit,
 - a double, starts with a digit and has a dot (.) in the middle.
 
-The arguments of the generics are available at runtime using to forms
-- [Restriction](src/main/java/com/github/forax/civilizer/vm/Restriction.java) that specify
-  the class of each method parameters.
-- [Linkage](src/main/java/com/github/forax/civilizer/vm/Linkage.java) that specifies the type parameters for
+Runtime objects used by condy-LISP:
+- [Linkage](src/main/java/com/github/forax/civilizer/vm/Linkage.java): specify the type parameters for
   the opcodes `new`, `anewarray`, `invokespecial`, `invokevirtual`, `invokeinterface` and `invokestatic`.
+- [Restriction](src/main/java/com/github/forax/civilizer/vm/Restriction.java): specify
+  the class of each method parameters.
+- [Species](src/main/java/com/github/forax/civilizer/vm/Species.java): a pair raw Class + an argument (arguments).
+- [Super](src/main/java/com/github/forax/civilizer/vm/Super.java): specify the super species (superclass + interfaces
+  with their parameters).
 
 To specify the linkage of a specialized operation, the rewriter recognize the pattern
 ```java
