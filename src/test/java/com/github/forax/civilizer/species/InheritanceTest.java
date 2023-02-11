@@ -125,7 +125,8 @@ public class InheritanceTest {
     PairTest.test();
   }
 
-  /*@Parametric("P0")
+
+  @Parametric("P0")
   interface ParametricInterface<T> {
     String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
     String $P1 = "anchor P0;";
@@ -137,18 +138,80 @@ public class InheritanceTest {
     }
   }
 
-  @SuperType("P2")
-  @Parametric("P3")
-  class AClass implements ParametricInterface<String> {
-    private static final String $P0 = "list Ljava/lang/String;";
-    private static final String $P1 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface P0;";
-    private static final String $P2 = "super P1;";
-    private static final String $P3 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+  @Test
+  public void testDefaultMethod() {
+    @SuperType("P2")
+    class StringArgument implements ParametricInterface<String> {
+      private static final String $P0 = "list Ljava/lang/String;";
+      private static final String $P1 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface; P0;";
+      private static final String $P2 = "super P1;";
+    }
+
+    @SuperType("P2")
+    class IntegerArgument implements ParametricInterface<String> {
+      private static final String $P0 = "list Ljava/lang/Integer;";
+      private static final String $P1 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface; P0;";
+      private static final String $P2 = "super P1;";
+    }
+
+    var stringArgument = new StringArgument();
+    assertEquals(String.class, stringArgument.dump());
+
+    var integerArgument = new IntegerArgument();
+    assertEquals(Integer.class, integerArgument.dump());
+  }
+
+
+  @Test
+  public void testDefaultMethodParametricClass() {
+    @Parametric("P0")
+    @SuperType("P3")
+    record ParametricArgument<T>() implements ParametricInterface<T> {
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+      private static final String $P1 = "anchor P0;";
+      private static final String $P2 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface; P1;";
+      private static final String $P3 = "super P2;";
+    }
+
+    class Test {
+      private static final String $P0 = "list Ljava/lang/String;";
+      private static final String $P1 = "linkage P0;";
+      private static final String $P2 = "list Ljava/lang/Integer;";
+      private static final String $P3 = "linkage P2;";
+
+      static void test() {
+        "P1".intern();
+        var stringArgument = new ParametricArgument<String>();
+        assertEquals(String.class, stringArgument.dump());
+
+        "P3".intern();
+        var integerArgument = new ParametricArgument<Integer>();
+        assertEquals(Integer.class, integerArgument.dump());
+      }
+    }
+
+    Test.test();
+  }
+
+
+  @Parametric("P1")
+  interface ParametricInterface2<T> {
+    String $P0 = "list Ljava/lang/Object;";
+    String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    String $P2 = "anchor P1;";
+    String $P3 = "list.get P2; 0";
+
+    default Object dump() {
+      "P3".intern();
+      return RT.ldc();
+    }
   }
 
   @Test
-  public void testDefaultMethod() {
-    var aClass = new AClass();
-    assertEquals(String.class, aClass.dump());
-  }*/
+  public void testDefaultMethodNoSuperTypeAnnotation() {
+    class NoArgument implements ParametricInterface2<Object> { }
+
+    var noArgument = new NoArgument();
+    assertEquals(Object.class, noArgument.dump());
+  }
 }

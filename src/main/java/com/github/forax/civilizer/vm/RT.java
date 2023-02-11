@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static java.lang.invoke.MethodHandles.constant;
 import static java.lang.invoke.MethodHandles.dropArguments;
 import static java.lang.invoke.MethodHandles.exactInvoker;
 import static java.lang.invoke.MethodHandles.filterArguments;
@@ -158,16 +159,22 @@ public final class RT {
     var kiddyPoolClass =  KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
         sp -> createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null)));
     if (speciesRaw.isAnnotationPresent(SuperType.class)) {
-      SUPER_KIDDY_POOLS.get(kiddyPoolClass);
+      System.err.println("Super type " + speciesRaw.getAnnotation(SuperType.class));
+      SUPER_SPECIES_MAP.get(kiddyPoolClass);
     }
     return kiddyPoolClass;
   }
 
-  private static final ClassValue<HashMap<Class<?>, Class<?>>> SUPER_KIDDY_POOLS = new ClassValue<>() {
+  private record SuperSpecies(HashMap<Class<?>, Class<?>> superMap) {}
+
+  private static final ClassValue<SuperSpecies> SUPER_SPECIES_MAP = new ClassValue<>() {
     @Override
-    protected HashMap<Class<?>, Class<?>> computeValue(Class<?> type) {
-      var nestHost = type.getNestHost();
-      var superType = nestHost.getAnnotation(SuperType.class);
+    protected SuperSpecies computeValue(Class<?> type) {
+      var superType = type.getAnnotation(SuperType.class);
+      if (superType == null) {
+        // no specialized super types specified
+        return new SuperSpecies(new HashMap<>());
+      }
       var superRef = superType.value();
       var speciesLookup = privateSpeciesLookup(MethodHandles.lookup(), type);
       MethodHandle accessor;
@@ -178,21 +185,42 @@ public final class RT {
       } catch (IllegalAccessException e) {
         throw (IllegalAccessError) new IllegalAccessError().initCause(e);
       }
-      Super zuper = null;
+      Super superValue;
       try {
-        zuper = (Super) (Object) accessor.invokeExact();
+        superValue = (Super) (Object) accessor.invokeExact();
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
         throw new LinkageError("error while accessing super " + superRef, e);
       }
       var superMap = new HashMap<Class<?>, Class<?>>();
-      for(var superSpecies: zuper.species()) {
+      for(var superSpecies: superValue.species()) {
         superMap.put(superSpecies.raw(), kiddyPoolClass(speciesLookup, superSpecies));
       }
-      return superMap;
+      return new SuperSpecies(superMap);
     }
   };
+
+  private static Class<?> superKiddyPool(Lookup lookup, Class<?> kiddyPoolClass, Class<?> superRaw) {
+    var superSpecies = SUPER_SPECIES_MAP.get(kiddyPoolClass);
+    var superKiddyPool = superSpecies.superMap.get(superRaw);
+    if (superKiddyPool != null) {
+      return superKiddyPool;
+    }
+    // no specified in SuperType, so find a default kiddyPool
+    var parametric = superRaw.isAnnotationPresent(Parametric.class);
+    if (parametric) {
+      // instantiate a raw super
+      var superRawLookup = privateSpeciesLookup(lookup, superRaw);
+      superKiddyPool = kiddyPoolClass(superRawLookup, new Species(superRaw, null));
+    } else {
+      // not parametric, superRaw is good enough
+      superKiddyPool = superRaw;
+    }
+    // update cache
+    superSpecies.superMap.put(superRaw, superKiddyPool);
+    return superKiddyPool;
+  }
 
   private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) {
     var mhInfo = lookup.revealDirect(method);
@@ -259,6 +287,48 @@ public final class RT {
     }
   }
 
+  private static final class KiddyPoolSuperInliningCache extends MutableCallSite {
+    private static final MethodHandle SLOW_PATH, POINTER_CHECK;
+    static {
+      var lookup = MethodHandles.lookup();
+      try {
+        SLOW_PATH = lookup.findVirtual(KiddyPoolSuperInliningCache.class, "slowPath", methodType(MethodHandle.class, Object.class));
+        POINTER_CHECK = lookup.findStatic(KiddyPoolSuperInliningCache.class, "pointerCheck", methodType(boolean.class, Object.class, Object.class));
+      } catch (NoSuchMethodException | IllegalAccessException e) {
+        throw new AssertionError(e);
+      }
+    }
+
+    private final Lookup lookup;
+    private final Class<?> superRaw;
+
+    @SuppressWarnings("ThisEscapedInObjectConstruction")
+    private KiddyPoolSuperInliningCache(MethodType type, Lookup lookup, Class<?> superRaw) {
+      super(type);
+      this.lookup = lookup;
+      this.superRaw = superRaw;
+      var combiner = dropArguments(SLOW_PATH.bindTo(this), 0, type.parameterList().subList(0, type.parameterCount() - 1));
+      setTarget(foldArguments(exactInvoker(type), combiner));
+    }
+
+    private static boolean pointerCheck(Object o, Object o2) {
+      return o == o2;
+    }
+
+    private MethodHandle slowPath(Object kiddyPool) {
+      var kiddyPoolClass = (Class<?>) kiddyPool;
+      var superKiddyPool = superKiddyPool(lookup, kiddyPoolClass, superRaw);
+
+      var target = dropArguments(constant(Object.class, superKiddyPool), 0, Object.class);
+
+      var test = POINTER_CHECK.bindTo(kiddyPool);
+      var guard = guardWithTest(test, target, new KiddyPoolSuperInliningCache(type(), lookup, superRaw).dynamicInvoker());
+      setTarget(guard);
+
+      return target;
+    }
+  }
+
   private static final class VirtualCallInliningCache extends MutableCallSite {
     @FunctionalInterface
     private interface BSM {
@@ -311,7 +381,7 @@ public final class RT {
       return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
           value -> bsm_ldc(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
-    return new ConstantCallSite(MethodHandles.constant(Object.class, constant));
+    return new ConstantCallSite(constant(Object.class, constant));
   }
 
   @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
@@ -436,7 +506,7 @@ public final class RT {
         throw new LinkageError(restriction + " has too many types, only one is required");
       }
       var defaultValue = Array.get(Array.newInstance(restrictionTypes.get(0), 1), 0);
-      return new ConstantCallSite(MethodHandles.constant(type.returnType(), defaultValue));
+      return new ConstantCallSite(constant(type.returnType(), defaultValue));
     }
     if (constant instanceof String kiddyPoolRef) {
       return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
@@ -503,7 +573,7 @@ public final class RT {
 
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_condy(Lookup lookup, String name, Class<?> type, String action, Object... args) throws Throwable {
-    System.err.println("bsm_condy " + name + " " + action + " " + Arrays.toString(args));
+    // System.err.println("bsm_condy " + name + " " + action + " " + Arrays.toString(args));
 
     try {
       return switch (action) {
@@ -553,16 +623,22 @@ public final class RT {
   public static CallSite bsm_interface_kiddy_pool(Lookup lookup, String name, MethodType type) {
     System.out.println("bsm_interface_kiddy_pool " + lookup + " " + name + " " + type);
 
-    var interfaceType = type.parameterType(0);
+    var rawSuper = lookup.lookupClass();
     return new VirtualCallInliningCache(type, lookup,
         receiverClass -> {
-           //FIXME, check if the receiver class is Parametric
+          var receiverLookup = privateSpeciesLookup(lookup, receiverClass);
+          var isParametric = receiverClass.isAnnotationPresent(Parametric.class);
+          if (isParametric) {
+             var inliningCache = new KiddyPoolSuperInliningCache(methodType(Object.class, Object.class), receiverLookup, rawSuper);
+             var kiddyPoolGetter = receiverLookup.findGetter(receiverClass, "$kiddyPool", Object.class)
+                 .asType(methodType(Object.class, type.parameterType(0)));
+             var target = filterArguments(inliningCache.dynamicInvoker(), 0, kiddyPoolGetter);
+             return new ConstantCallSite(target);
+          }
 
-           var receiverLookup = privateSpeciesLookup(lookup, receiverClass);
-           receiverLookup.findStatic(receiverClass, "$kiddyPool", methodType(Object.class));
-
-           //SUPER_KIDDY_POOLS.get();
-          throw new UnsupportedOperationException("NYI");
+          var superKiddyPool = superKiddyPool(receiverLookup, receiverClass, rawSuper);
+          var target = dropArguments(constant(Object.class, superKiddyPool), 0, type.parameterType(0));
+          return new ConstantCallSite(target);
         });
   }
 }

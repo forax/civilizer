@@ -2,6 +2,7 @@ package com.github.forax.civilizer;
 
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
+import com.github.forax.civilizer.vm.SuperType;
 import com.github.forax.civilizer.vm.TypeRestriction;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
@@ -15,7 +16,6 @@ import org.objectweb.asm.Type;
 
 import java.io.IOException;
 import java.lang.constant.ClassDesc;
-import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
@@ -35,12 +35,17 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.lang.constant.ConstantDescs.CD_Object;
+import static java.lang.constant.ConstantDescs.CD_Void;
+import static java.lang.constant.ConstantDescs.CD_int;
+import static java.lang.constant.ConstantDescs.CD_void;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
@@ -221,6 +226,7 @@ public final class VMRewriter {
     var reader = new ClassReader(buffer);
     var cv = new ClassVisitor(ASM9) {
       private static final String PARAMETRIC_DESCRIPTOR = "L" + Parametric.class.getName().replace('.', '/') + ";";
+      private static final String SUPER_TYPE_DESCRIPTOR = "L" + SuperType.class.getName().replace('.', '/') + ";";
       private static final String TYPE_RESTRICTION_DESCRIPTOR = "L" + TypeRestriction.class.getName().replace('.', '/') + ";";
 
       private String internalName;
@@ -238,7 +244,7 @@ public final class VMRewriter {
             if (!name.equals("value") || !(value instanceof String constant)) {
               throw new AssertionError("Parametric is malformed !");
             }
-            if (!"".equals(constant)) {
+            if (!"".equals(constant)) {   // FIXME ??
               anchorKindMap.merge(constant, anchorKind, (k1, k2) -> {
                 if (k1 != k2) {
                   throw new RewriterException("anchor " + constant + " defined as both a class and a method anchor");
@@ -248,6 +254,19 @@ public final class VMRewriter {
               // an accessor must be generated
               condyFieldAccessors.add("$" + constant);
             }
+          }
+        };
+      }
+
+      private AnnotationVisitor superTypeAnnotationVisitor() {
+        return new AnnotationVisitor(ASM9) {
+          @Override
+          public void visit(String name, Object value) {
+            if (!name.equals("value") || !(value instanceof String constant)) {
+              throw new AssertionError("SuperType is malformed !");
+            }
+            // an accessor must be generated
+            condyFieldAccessors.add("$" + constant);
           }
         };
       }
@@ -269,6 +288,9 @@ public final class VMRewriter {
         if (descriptor.equals(PARAMETRIC_DESCRIPTOR)) {
           parametric = true;
           return parametricAnnotationVisitor(AnchorKind.ClASS);
+        }
+        if (descriptor.equals(SUPER_TYPE_DESCRIPTOR)) {
+          return superTypeAnnotationVisitor();
         }
         return null;
       }
@@ -514,6 +536,7 @@ public final class VMRewriter {
 
   private static byte[] rewrite(byte[] buffer, Analysis analysis) {
     var reader = new ClassReader(buffer);
+    var isInterface = (reader.getAccess() & ACC_INTERFACE) != 0;
     var internalName = reader.getClassName();
     var supername = reader.getSuperName();
     var classDataMap = analysis.classDataMap;
@@ -577,7 +600,7 @@ public final class VMRewriter {
         MethodVisitor delegate;
         if (classData.parametric && methodName.equals("<init>")) { // need to initialize the kiddy pool
           var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
-          desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+          desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
           var newMethodDescriptor = desc.descriptorString();
           delegateMethod(access, "<init>", methodDescriptor, newMethodDescriptor, BSM_RAW_KIDDY_POOL);
           var mv = super.visitMethod(access | ACC_SYNTHETIC, methodName, newMethodDescriptor, null, null);
@@ -604,7 +627,7 @@ public final class VMRewriter {
                   var desc = MethodTypeDesc.of(ClassDesc.ofDescriptor(field.descriptor));
                   if (condyInfo.inKiddyPool) {
                     mv.visitVarInsn(ALOAD, kiddyPoolSlot); // load $kiddyPool
-                    desc = desc.insertParameterTypes(0, ConstantDescs.CD_Object);
+                    desc = desc.insertParameterTypes(0, CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("initDefault", desc.descriptorString(), BSM_INIT_DEFAULT, constant);
                   mv.visitFieldInsn(PUTFIELD, internalName, field.name, field.descriptor);
@@ -622,7 +645,7 @@ public final class VMRewriter {
         } else {
           if (parametricMethod) {
             var desc = MethodTypeDesc.ofDescriptor(methodDescriptor);
-            desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+            desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
             var newMethodDescriptor = desc.descriptorString();
             var tag = ((access & ACC_STATIC) != 0) ? H_INVOKESTATIC : H_INVOKEVIRTUAL;
             var methodHandle = new Handle(tag, internalName, methodName, newMethodDescriptor, false);
@@ -652,10 +675,10 @@ public final class VMRewriter {
                 slot += type.getSize();
               }
               var condyInfo = findCondyInfo(constant);
-              var desc = MethodTypeDesc.ofDescriptor(methodDescriptor).changeReturnType(ConstantDescs.CD_void);
+              var desc = MethodTypeDesc.ofDescriptor(methodDescriptor).changeReturnType(CD_void);
               if (condyInfo.inKiddyPool) {
                 loadKiddyPool();
-                desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
+                desc = desc.insertParameterTypes(1, CD_Object);
               }
               mv.visitInvokeDynamicInsn(methodName, desc.descriptorString(), BSM_METHOD_RESTRICTION, constant);
             }
@@ -665,8 +688,14 @@ public final class VMRewriter {
             if (parametricMethod) {
               mv.visitVarInsn(ALOAD, kiddyPoolSlot);
             } else {
-              mv.visitVarInsn(ALOAD, 0);
-              mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+              if (isInterface) {
+                mv.visitVarInsn(ALOAD, 0);
+                var desc = MethodTypeDesc.of(CD_Object, ClassDesc.ofInternalName(internalName));
+                mv.visitInvokeDynamicInsn("$kiddyPool", desc.descriptorString(), BSM_INTERFACE_KIDDY_POOL);
+              } else {
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, internalName, "$kiddyPool", "Ljava/lang/Object;");
+              }
             }
           }
 
@@ -694,10 +723,10 @@ public final class VMRewriter {
               if (fieldRestriction != null) {
                 var constant = fieldRestriction.constant;
                 var condyInfo = findCondyInfo(constant);
-                var desc = MethodTypeDesc.of(ConstantDescs.CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
+                var desc = MethodTypeDesc.of(CD_Void, ClassDesc.ofInternalName(owner), ClassDesc.ofDescriptor(descriptor));
                 if (condyInfo.inKiddyPool) {
                   loadKiddyPool();
-                  desc = desc.insertParameterTypes(1, ConstantDescs.CD_Object);
+                  desc = desc.insertParameterTypes(1, CD_Object);
                 }
                 mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_PUT_VALUE, constant);
                 return;
@@ -748,7 +777,7 @@ public final class VMRewriter {
                   desc = desc.changeReturnType(ClassDesc.ofInternalName(owner));
                   if (!(constant instanceof ConstantDynamic)) {
                     loadKiddyPool();
-                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                    desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("new", desc.descriptorString(), BSM_NEW, constant);
                   return;
@@ -761,7 +790,7 @@ public final class VMRewriter {
                   var desc = MethodTypeDesc.ofDescriptor(descriptor);
                   if (!(constant instanceof ConstantDynamic)) {
                     loadKiddyPool();
-                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                    desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
                   }
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_STATIC, Type.getObjectType(owner), constant);
                   return;
@@ -775,7 +804,7 @@ public final class VMRewriter {
                   desc = desc.insertParameterTypes(0, ClassDesc.ofInternalName(owner));
                   if (!(constant instanceof ConstantDynamic)) {
                     loadKiddyPool();
-                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                    desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
                   }
                   mv.visitInvokeDynamicInsn(name, desc.descriptorString(), BSM_VIRTUAL, constant);
                   return;
@@ -802,10 +831,10 @@ public final class VMRewriter {
                 if (constantValue != null) {
                   var constant = constantValue;
                   constantValue = null;
-                  var desc = MethodTypeDesc.of(ClassDesc.ofInternalName(type).arrayType(), ConstantDescs.CD_int);
+                  var desc = MethodTypeDesc.of(ClassDesc.ofInternalName(type).arrayType(), CD_int);
                   if (!(constant instanceof ConstantDynamic)) {
                     loadKiddyPool();
-                    desc = desc.insertParameterTypes(desc.parameterCount(), ConstantDescs.CD_Object);
+                    desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
                   }
                   mv.visitInvokeDynamicInsn("newArray", desc.descriptorString(), BSM_NEW_ARRAY, constant);
                   return;
@@ -848,8 +877,10 @@ public final class VMRewriter {
       @Override
       public void visitEnd() {
         if (classData.parametric) {  // parametric class
-          var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
-          fv.visitEnd();
+          if (!isInterface) {
+            var fv = cv.visitField(ACC_PRIVATE | ACC_FINAL | ACC_SYNTHETIC, "$kiddyPool", "Ljava/lang/Object;", null, null);
+            fv.visitEnd();
+          }
 
           if (!classData.methodParametricSet.isEmpty()) {  //FIXME better to check if there is an anchor with a parent anchor
             var mv = cv.visitMethod(ACC_STATIC | ACC_PRIVATE | ACC_SYNTHETIC, "$classData", "()Ljava/lang/Object;", null, null);
