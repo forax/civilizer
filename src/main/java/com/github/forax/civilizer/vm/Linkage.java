@@ -1,7 +1,5 @@
 package com.github.forax.civilizer.vm;
 
-import java.lang.invoke.MethodType;
-import java.util.List;
 import java.util.Objects;
 
 import static java.util.stream.Collectors.joining;
