@@ -14,8 +14,8 @@ public class SimpleListTest {
   @Parametric("P1")
   static class SimpleList<E> {
     private static final String $P0 = "list Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
-    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P2 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $P3 = "anchor P1;";
     private static final String $P4 = "list.get P3; 0";
     private static final String $P5 = "linkage P4;";

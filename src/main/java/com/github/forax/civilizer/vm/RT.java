@@ -47,30 +47,40 @@ public final class RT {
     throw new LinkageError("this method should be rewritten by the rewriter, so never reach that point");
   }
 
+  private static final HashMap<Location.Key, Object> CACHE = new HashMap<>();
+
   @SuppressWarnings("unused")  // used by reflection
-  public static Object erase(/*List<?>*/Object parameters, /*List<?>*/Object defaults) {
-    var parameterList = (List<?>) parameters;
-    var defaultList = (List<?>) defaults;
+  public static Object erase(/*Location*/Object locationObj, /*List<?>*/Object parametersObj, /*List<?>*/Object defaultsObj) {
+    System.out.println("erase " + locationObj + " " + parametersObj + " " + defaultsObj);
+    var location = (Location) locationObj;
+    var parameterList = (List<?>) parametersObj;
+    var defaultList = (List<?>) defaultsObj;
+    List<?> erasedList;
     if (parameterList == null) {
-      return defaults;
+      erasedList = defaultList;
+    } else {
+      if (parameterList.size() != defaultList.size()) {
+        throw new LinkageError("instantiation arguments " + parameterList + " and default arguments " + defaultList + " have no the same size");
+      }
+      erasedList = IntStream.range(0, parameterList.size())
+          .mapToObj(i -> {
+            var parameter = parameterList.get(i);
+            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.runtime.RT.isSecondaryType(clazz) ? clazz : defaultList.get(i);
+          }).toList();
     }
-    if (parameterList.size() != defaultList.size()) {
-      throw new LinkageError("instantiation arguments " + parameters + " and default arguments " + defaultList + " have no the same size");
-    }
-    return IntStream.range(0, parameterList.size())
-        .mapToObj(i -> {
-          var parameter = parameterList.get(i);
-          return parameter instanceof Class<?> clazz && com.github.forax.civilizer.runtime.RT.isSecondaryType(clazz) ? clazz : defaultList.get(i);
-        }).toList();
+    var key = location.key(erasedList);
+    return CACHE.computeIfAbsent(key, k -> location.specialize(erasedList));
   }
 
   @SuppressWarnings("unused")  // used by reflection
-  public static Object identity(Object parameters) {
-    return parameters;
+  public static Object identity(/*Location*/Object locationObj, Object parameters) {
+    var location = (Location) locationObj;
+    var key = location.key(parameters);
+    return CACHE.computeIfAbsent(key, k -> location.specialize(parameters));
   }
 
 
-  private static Class<?> createKiddyPoolClass(Lookup lookup, Class<?> type, Object classData) {
+  static Class<?> createKiddyPoolClass(Lookup lookup, Class<?> type, Anchor classData) {
     var input = type.getResourceAsStream("/" + type.getName().replace('.', '/') + ".class");
     if (input == null) {
       throw new LinkageError("no bytecode available for " + type);
@@ -113,13 +123,7 @@ public final class RT {
     return kiddyPoolLookup.lookupClass();
   }
 
-  private record Anchor(Object classParameters, Object methodParameters) {}
-
-  private record MethodSpecies(Species species, String name, String descriptor, Object methodParameters) {}
-
-  // caches should be concurrent and maintain a weak ref on the class
-  private static final HashMap<Species, Class<?>> KIDDY_POOL_CACHE = new HashMap<>();
-  private static final HashMap<MethodSpecies, Class<?>> KIDDY_POOL_METH_CACHE = new HashMap<>();
+  record Anchor(Object classParameters, Object methodParameters) {}
 
   private static Lookup privateSpeciesLookup(Lookup lookup, Class<?> raw) {
     try {
@@ -129,16 +133,17 @@ public final class RT {
     }
   }
 
-  private static Object callBSM(Lookup speciesLookup, Species species, String bsmPoolRef, Object parameters) {
+  private static Class<?> callBSM(Lookup speciesLookup, Class<?> raw, String bsmPoolRef, Location location, Object parameters) {
+    System.out.println("callBSM " + bsmPoolRef + " " + location + " " + parameters);
     MethodHandle bsmPool;
     try {
-      bsmPool = speciesLookup.findStatic(species.raw(), "$" + bsmPoolRef, methodType(Object.class));
+      bsmPool = speciesLookup.findStatic(raw, "$" + bsmPoolRef, methodType(Object.class));
     } catch(NoSuchMethodException | IllegalAccessException e) {
       throw new LinkageError("constant pool constant $" + bsmPoolRef, e);
     }
     try {
       var bsm = (MethodHandle) (Object) bsmPool.invokeExact();
-      return bsm.invoke(parameters);
+      return (Class<?>) bsm.invoke(location, parameters);
     } catch (Error e) {
       throw e;
     } catch(Throwable e) {
@@ -146,19 +151,16 @@ public final class RT {
     }
   }
 
-  private static Class<?> kiddyPoolClass(Lookup lookup, Species species) {
-    Class<?> speciesRaw = species.raw();
-    var parametric = speciesRaw.getAnnotation(Parametric.class);
+  private static Class<?> classKiddyPoolClass(Lookup lookup, Class<?> raw, Object classParameters) {
+    var parametric = raw.getAnnotation(Parametric.class);
     if (parametric == null) {
-      throw new LinkageError(speciesRaw + " is not declared parametric");
+      throw new LinkageError(raw + " is not declared parametric");
     }
-    var speciesLookup = privateSpeciesLookup(lookup, speciesRaw);
+    var speciesLookup = privateSpeciesLookup(lookup, raw);
     var bsmPoolRef = parametric.value();
-    var parameters = callBSM(speciesLookup, species, bsmPoolRef, species.parameters());
-    var keySpecies = new Species(speciesRaw, parameters);
-    var kiddyPoolClass =  KIDDY_POOL_CACHE.computeIfAbsent(keySpecies,
-        sp -> createKiddyPoolClass(speciesLookup, sp.raw(), new Anchor(sp.parameters(), null)));
-    if (speciesRaw.isAnnotationPresent(SuperType.class)) {
+    var location = Location.classLocation(speciesLookup, raw);
+    var kiddyPoolClass = callBSM(speciesLookup, raw, bsmPoolRef, location, classParameters);
+    if (raw.isAnnotationPresent(SuperType.class)) {
       //System.err.println("Super type " + speciesRaw.getAnnotation(SuperType.class));
       SUPER_SPECIES_MAP.get(kiddyPoolClass);
     }
@@ -195,7 +197,7 @@ public final class RT {
       }
       var superMap = new HashMap<Class<?>, Class<?>>();
       for(var superSpecies: superValue.species()) {
-        superMap.put(superSpecies.raw(), kiddyPoolClass(speciesLookup, superSpecies));
+        superMap.put(superSpecies.raw(), classKiddyPoolClass(speciesLookup, superSpecies.raw(), superSpecies.parameters()));
       }
       return new SuperSpecies(superMap);
     }
@@ -212,7 +214,7 @@ public final class RT {
     if (parametric) {
       // instantiate a raw super
       var superRawLookup = privateSpeciesLookup(lookup, superRaw);
-      superKiddyPool = kiddyPoolClass(superRawLookup, new Species(superRaw, null));
+      superKiddyPool = classKiddyPoolClass(superRawLookup, superRaw, null);
     } else {
       // not parametric, superRaw is good enough
       superKiddyPool = superRaw;
@@ -222,19 +224,17 @@ public final class RT {
     return superKiddyPool;
   }
 
-  private static Class<?> kiddyPoolClass(Lookup lookup, MethodSpecies methodSpecies, MethodHandle method) {
+  private static Class<?> methodKiddyPoolClass(Lookup lookup, Class<?> raw, Object classParameters, String methodName, String methodDescriptor, Object methodParameters, MethodHandle method) {
     var mhInfo = lookup.revealDirect(method);
     var reflected = mhInfo.reflectAs(Method.class, lookup);
     var parametric = reflected.getAnnotation(Parametric.class);
     if (parametric == null) {
       throw new LinkageError(reflected + " is not declared parametric");
     }
-    var speciesLookup = privateSpeciesLookup(lookup, methodSpecies.species.raw());
+    var speciesLookup = privateSpeciesLookup(lookup, raw);
     var bsmPoolRef = parametric.value();
-    var methodParameters = callBSM(speciesLookup, methodSpecies.species, bsmPoolRef, methodSpecies.methodParameters);
-    var keyMethodSpecies = new MethodSpecies(methodSpecies.species, methodSpecies.name, methodSpecies.descriptor, methodParameters);
-    return KIDDY_POOL_METH_CACHE.computeIfAbsent(keyMethodSpecies,
-        msp -> createKiddyPoolClass(speciesLookup, msp.species.raw(), new Anchor(msp.species.parameters(), msp.methodParameters)));
+    var location = Location.methodLocation(speciesLookup, raw, classParameters, methodName, methodDescriptor);
+    return callBSM(speciesLookup, raw, bsmPoolRef, location, methodParameters);
   }
 
   private static final class KiddyPoolRefInliningCache extends MutableCallSite {
@@ -390,8 +390,7 @@ public final class RT {
 
     if (constant instanceof Linkage linkage) {
       var method = lookup.findStatic(owner, name, type.appendParameterTypes(Object.class));
-      var methodSpecies = new MethodSpecies(new Species(owner, null), name, type.toMethodDescriptorString(), linkage.parameters());
-      var kiddyPoolClass = kiddyPoolClass(lookup, methodSpecies, method);
+      var kiddyPoolClass = methodKiddyPoolClass(lookup, owner, null, name, type.toMethodDescriptorString(), linkage.parameters(), method);
       var mh = insertArguments(method, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(mh);
     }
@@ -422,10 +421,8 @@ public final class RT {
                       var classParameters = ((Anchor) anchor).classParameters;
 
                       // call the de-virtualized method with a kiddy pool created with the pair (species parameter + method parameter)
-                      var species = new Species(receiverClass, classParameters);
                       var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
-                      var methodSpecies = new MethodSpecies(species, name, type.toMethodDescriptorString(), linkage.parameters());
-                      var kiddyPoolClass = kiddyPoolClass(speciesLookup, methodSpecies, method);
+                      var kiddyPoolClass = methodKiddyPoolClass(speciesLookup, receiverClass, classParameters, name, type.toMethodDescriptorString(), linkage.parameters(), method);
                       var target = insertArguments(method, type.parameterCount(), kiddyPoolClass);
                       return new ConstantCallSite(target);
                     });
@@ -439,10 +436,8 @@ public final class RT {
               }
 
               // call the de-virtualized method with a kiddy pool created with no species parameters (only a method parameters)
-              var species = new Species(receiverClass, null);
               var method = speciesLookup.findVirtual(receiverClass, name, type.dropParameterTypes(0, 1).appendParameterTypes(Object.class));
-              var methodSpecies = new MethodSpecies(species, name, type.toMethodDescriptorString(), linkage.parameters());
-              var kiddyPoolClass = kiddyPoolClass(speciesLookup, methodSpecies, method);
+              var kiddyPoolClass = methodKiddyPoolClass(speciesLookup, receiverClass, null, name, type.toMethodDescriptorString(), linkage.parameters(), method);
               var target = insertArguments(method, type.parameterCount(), kiddyPoolClass);
               return new ConstantCallSite(target);
             });
@@ -466,7 +461,7 @@ public final class RT {
     if (constant instanceof Linkage linkage) {
       var owner = type.returnType();
       var init = lookup.findConstructor(owner, type.changeReturnType(void.class).appendParameterTypes(Object.class));
-      var kiddyPoolClass = kiddyPoolClass(lookup, new Species(owner, linkage.parameters()));
+      var kiddyPoolClass = classKiddyPoolClass(lookup, owner, linkage.parameters());
       var method = insertArguments(init, type.parameterCount(), kiddyPoolClass);
       return new ConstantCallSite(method);
     }
@@ -591,9 +586,10 @@ public final class RT {
         case "species.raw" -> ((Species) args[0]).raw();
         case "species.parameters" -> ((Species) args[0]).parameters();
         case "linkage" -> new Linkage(args[0]);
-        case "mh" -> insertArguments(
-              lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]),
-              1, Arrays.stream(args).skip(3).toArray());
+        case "mh" -> {
+          var target = lookup.findStatic((Class<?>) args[0], (String) args[1], (MethodType) args[2]);
+          yield insertArguments(target, target.type().parameterCount() - (args.length - 3), Arrays.stream(args).skip(3).toArray());
+        }
         case "restriction" -> new Restriction(Arrays.stream(args).<Class<?>>map(o -> (Class<?>) o).toList());
         case "super" -> new Super(Arrays.stream(args).map(o -> (Species) o).toList());
         default -> throw new LinkageError("unknown method " + action + " " + Arrays.toString(args));
@@ -606,17 +602,14 @@ public final class RT {
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_raw_kiddy_pool(Lookup lookup, String name, Class<?> type) {
     //System.out.println("bsm_raw_kiddy_pool");
-    var species = new Species(lookup.lookupClass(), null);
-    return kiddyPoolClass(lookup, species);
+    return classKiddyPoolClass(lookup, lookup.lookupClass(), null);
   }
 
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_raw_method_kiddy_pool(Lookup lookup, String name, Class<?> type, MethodHandle method) {
     //System.out.println("bsm_raw_method_kiddy_pool");
     var methodInfo = lookup.revealDirect(method);
-    var species = new Species(lookup.lookupClass(), null);
-    var methodSpecies = new MethodSpecies(species, methodInfo.getName(), methodInfo.getMethodType().toMethodDescriptorString(), null);
-    return kiddyPoolClass(lookup, methodSpecies, method);
+    return methodKiddyPoolClass(lookup, lookup.lookupClass(), null, methodInfo.getName(), methodInfo.getMethodType().toMethodDescriptorString(), null, method);
   }
 
   @SuppressWarnings("unused") // used by reflection

@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class InheritanceTest {
   @Parametric("P0")
   static class Holder<T> {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
 
     private static final String $PA_0 = "anchor P0;";
     private static final String $PA_1 = "list.get PA_0; 0";
@@ -70,8 +70,8 @@ public class InheritanceTest {
 
   @Parametric("P0")
   static class Pair<T, U> {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
 
     private static final String $PA_0 = "anchor P0;";
     private static final String $PA_1 = "list.get PA_0; 0";
@@ -128,7 +128,7 @@ public class InheritanceTest {
 
   @Parametric("P0")
   interface ParametricInterface<T> {
-    String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     String $P1 = "anchor P0;";
     String $P2 = "list.get P1; 0";
 
@@ -167,7 +167,7 @@ public class InheritanceTest {
     @Parametric("P0")
     @SuperType("P3")
     record ParametricArgument<T>() implements ParametricInterface<T> {
-      private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
       private static final String $P1 = "anchor P0;";
       private static final String $P2 = "species Lcom/github/forax/civilizer/species/InheritanceTest$ParametricInterface; P1;";
       private static final String $P3 = "super P2;";
@@ -197,7 +197,7 @@ public class InheritanceTest {
   @Parametric("P1")
   interface ParametricInterface2<T> {
     String $P0 = "list Ljava/lang/Object;";
-    String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     String $P2 = "anchor P1;";
     String $P3 = "list.get P2; 0";
 
@@ -218,7 +218,7 @@ public class InheritanceTest {
 
   @Parametric("P0")
   static class BaseClass<T> {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "list.get P1; 0";
 
@@ -231,7 +231,7 @@ public class InheritanceTest {
   @Parametric("P0")
   @SuperType("P3")
   static class SubType<T> extends BaseClass<T> {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "species Lcom/github/forax/civilizer/species/InheritanceTest$BaseClass; P1;";
     private static final String $P3 = "super P2;";
