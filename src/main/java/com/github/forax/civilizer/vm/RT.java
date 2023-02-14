@@ -44,7 +44,7 @@ public final class RT {
   }
 
   public static Object ldc() {
-    throw new LinkageError("this method should be rewritten by the rewriter, so never reach that point");
+    throw new LinkageError("method calls to this method should be rewritten by the rewriter");
   }
 
   private static final HashMap<Location.Key, Object> CACHE = new HashMap<>();
