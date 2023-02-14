@@ -51,7 +51,7 @@ public final class RT {
 
   @SuppressWarnings("unused")  // used by reflection
   public static Object erase(/*Location*/Object locationObj, /*List<?>*/Object parametersObj, /*List<?>*/Object defaultsObj) {
-    System.out.println("erase " + locationObj + " " + parametersObj + " " + defaultsObj);
+    //System.out.println("erase " + locationObj + " " + parametersObj + " " + defaultsObj);
     var location = (Location) locationObj;
     var parameterList = (List<?>) parametersObj;
     var defaultList = (List<?>) defaultsObj;
@@ -134,7 +134,7 @@ public final class RT {
   }
 
   private static Class<?> callBSM(Lookup speciesLookup, Class<?> raw, String bsmPoolRef, Location location, Object parameters) {
-    System.out.println("callBSM " + bsmPoolRef + " " + location + " " + parameters);
+    //System.out.println("callBSM " + bsmPoolRef + " " + location + " " + parameters);
     MethodHandle bsmPool;
     try {
       bsmPool = speciesLookup.findStatic(raw, "$" + bsmPoolRef, methodType(Object.class));
