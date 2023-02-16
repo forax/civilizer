@@ -262,7 +262,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data3<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "list Ljava/lang/String;";
     private static final String $P3 = "linkage P2;";
@@ -291,7 +291,7 @@ public class CondyLispTest {
 
 
   class MethodData {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/RT; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "linkage 42";
 

@@ -48,39 +48,6 @@ public final class RT {
     throw new LinkageError("method calls to this method should be rewritten by the rewriter");
   }
 
-  private static final HashMap<Location.Key, Object> CACHE = new HashMap<>();
-
-  @SuppressWarnings("unused")  // used by reflection
-  public static Object erase(/*Location*/Object locationObj, /*List<?>*/Object parametersObj, /*List<?>*/Object defaultsObj) {
-    //System.out.println("erase " + locationObj + " " + parametersObj + " " + defaultsObj);
-    var location = (Location) locationObj;
-    var parameterList = (List<?>) parametersObj;
-    var defaultList = (List<?>) defaultsObj;
-    List<?> erasedList;
-    if (parameterList == null) {
-      erasedList = defaultList;
-    } else {
-      if (parameterList.size() != defaultList.size()) {
-        throw new LinkageError("instantiation arguments " + parameterList + " and default arguments " + defaultList + " have no the same size");
-      }
-      erasedList = IntStream.range(0, parameterList.size())
-          .mapToObj(i -> {
-            var parameter = parameterList.get(i);
-            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.runtime.RT.isSecondaryType(clazz) ? clazz : defaultList.get(i);
-          }).toList();
-    }
-    var key = location.key(erasedList);
-    return CACHE.computeIfAbsent(key, k -> location.specialize(erasedList));
-  }
-
-  @SuppressWarnings("unused")  // used by reflection
-  public static Object identity(/*Location*/Object locationObj, Object parameters) {
-    var location = (Location) locationObj;
-    var key = location.key(parameters);
-    return CACHE.computeIfAbsent(key, k -> location.specialize(parameters));
-  }
-
-
   static Class<?> createKiddyPoolClass(Lookup lookup, Class<?> type, Anchor classData) {
     var input = type.getResourceAsStream("/" + type.getName().replace('.', '/') + ".class");
     if (input == null) {
