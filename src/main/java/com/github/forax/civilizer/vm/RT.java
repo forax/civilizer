@@ -5,6 +5,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.RecordComponentVisitor;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
@@ -100,6 +101,11 @@ public final class RT {
       }
 
       @Override
+      public RecordComponentVisitor visitRecordComponent(String name, String descriptor, String signature) {
+        return null;
+      }
+
+      @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
         return null;
       }
@@ -118,7 +124,7 @@ public final class RT {
     try {
       kiddyPoolLookup = lookup.defineHiddenClassWithClassData(data, classData, true, ClassOption.NESTMATE, ClassOption.STRONG);
     } catch (IllegalAccessException e) {
-      throw new RuntimeException(e);
+      throw (IllegalAccessError) new IllegalAccessError().initCause(e);
     }
     return kiddyPoolLookup.lookupClass();
   }
