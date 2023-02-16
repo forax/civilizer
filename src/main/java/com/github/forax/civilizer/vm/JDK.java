@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+@SuppressWarnings("unused")  // used by reflection
 public final class JDK {
   private JDK() {
     throw new AssertionError();
