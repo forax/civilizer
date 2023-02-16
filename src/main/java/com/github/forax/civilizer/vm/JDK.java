@@ -1,6 +1,5 @@
 package com.github.forax.civilizer.vm;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
