@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+/**
+ * Bootstrap methods used by the anchors.
+ */
 @SuppressWarnings("unused")  // used by reflection
 public final class JDK {
   private JDK() {
