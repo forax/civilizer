@@ -29,12 +29,12 @@
             <version>9.4</version>
             <scope>compile</scope>
         </dependency>
-        <dependency>
+        <!-- dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm-analysis</artifactId>
             <version>9.4</version>
             <scope>compile</scope>
-        </dependency>
+        </dependency -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
