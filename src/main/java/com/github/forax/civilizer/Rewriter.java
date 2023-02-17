@@ -1,5 +1,7 @@
 package com.github.forax.civilizer;
 
+import com.github.forax.civilizer.runtime.NonNull;
+import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
@@ -93,6 +95,9 @@ public final class Rewriter {
   private static final int ACONST_INIT = 203; // visitTypeInsn
   private static final int WITHFIELD = 204; // visitFieldInsn
 
+  private static final String NON_NULL_DESCRIPTOR = NonNull.class.descriptorString();
+  private static final String NULLABLE_DESCRIPTOR = Nullable.class.descriptorString();
+
   private static final class PreloadAttribute extends Attribute {
     private final List<String> classes ;
 
@@ -140,11 +145,13 @@ public final class Rewriter {
   }
 
   private static Optional<NullKind> nullKind(String descriptor) {
-    return switch (descriptor) {
-      case "Lcom/github/forax/civilizer/runtime/NonNull;" -> Optional.of(NullKind.NONNULL);
-      case "Lcom/github/forax/civilizer/runtime/Nullable;" -> Optional.of(NullKind.NULLABLE);
-      default -> Optional.empty();
-    };
+    if (descriptor.equals(NON_NULL_DESCRIPTOR)) {
+      return Optional.of(NullKind.NONNULL);
+    }
+    if (descriptor.equals(NULLABLE_DESCRIPTOR)) {
+      return Optional.of(NullKind.NULLABLE);
+    }
+    return Optional.empty();
   }
 
   private static Optional<ClassData> analyze(byte[] buffer) {
