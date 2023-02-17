@@ -945,7 +945,7 @@ public final class VMRewriter {
   public static void main(String[] args) throws IOException {
     var main = classes(Path.of("target/classes"), "species");
     var test = classes(Path.of("target/test-classes"), "species");
-    List<Path> classes = Stream.concat(main.stream(), test.stream()).toList();
+    var classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);
     //analysis.dump();
