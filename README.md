@@ -129,7 +129,7 @@ class SimpleList<E> {
 To use the `SimpleList` defined above, we need to specialize the creation (`new`) by providing a linkage
 saying that the type argument is the class `Complex`.
 ```java
-  private static final String $P0 = "list.of Qcom/github/forax/civilizer/demo/Complex;";
+  private static final String $P0 = "list.of Qcom/github/forax/civilizer/value/Complex;";
   private static final String $P1 = "linkage P0;";
   
   public static void main(String[] args) {
