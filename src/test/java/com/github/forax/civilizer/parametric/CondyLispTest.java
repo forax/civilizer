@@ -1,11 +1,11 @@
 package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.value.Complex;
-import com.github.forax.civilizer.vm.Linkage;
-import com.github.forax.civilizer.vm.Location;
-import com.github.forax.civilizer.vm.Parametric;
-import com.github.forax.civilizer.vm.RT;
-import com.github.forax.civilizer.vm.Species;
+import com.github.forax.civilizer.prt.Linkage;
+import com.github.forax.civilizer.prt.Location;
+import com.github.forax.civilizer.prt.Parametric;
+import com.github.forax.civilizer.prt.RT;
+import com.github.forax.civilizer.prt.Species;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -216,7 +216,7 @@ public class CondyLispTest {
   public void ldcClassDataNoArgument() {
     @Parametric("P0")
     class Foo<T> {
-      private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/prt/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
       private static final String $P1 = "anchor P0;";
 
       Object value() {
@@ -231,7 +231,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/prt/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "linkage 77";
 
@@ -261,7 +261,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data3<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "list Ljava/lang/String;";
     private static final String $P3 = "linkage P2;";
@@ -290,7 +290,7 @@ public class CondyLispTest {
 
 
   class MethodData {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/vm/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "linkage 42";
 

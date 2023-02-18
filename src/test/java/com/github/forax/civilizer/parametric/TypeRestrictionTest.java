@@ -1,8 +1,8 @@
 package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.value.Complex;
-import com.github.forax.civilizer.vm.Parametric;
-import com.github.forax.civilizer.vm.TypeRestriction;
+import com.github.forax.civilizer.prt.Parametric;
+import com.github.forax.civilizer.prt.TypeRestriction;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,7 +13,7 @@ public class TypeRestrictionTest {
   @Parametric("P1")
   static class Holder<T> {
     private static final String $P0 = "list Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/JDK; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/prt/JDK; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $PA0 = "anchor P1;";
     private static final String $PA1 = "list.get PA0; 0";
     private static final String $PA2 = "restriction PA1;";

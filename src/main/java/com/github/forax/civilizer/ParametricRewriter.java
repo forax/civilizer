@@ -1,9 +1,9 @@
 package com.github.forax.civilizer;
 
-import com.github.forax.civilizer.vm.Parametric;
-import com.github.forax.civilizer.vm.RT;
-import com.github.forax.civilizer.vm.SuperType;
-import com.github.forax.civilizer.vm.TypeRestriction;
+import com.github.forax.civilizer.prt.Parametric;
+import com.github.forax.civilizer.prt.RT;
+import com.github.forax.civilizer.prt.SuperType;
+import com.github.forax.civilizer.prt.TypeRestriction;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;

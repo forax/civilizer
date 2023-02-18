@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.vm;
+package com.github.forax.civilizer.prt;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;

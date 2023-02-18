@@ -1,6 +1,6 @@
-package com.github.forax.civilizer.vm;
+package com.github.forax.civilizer.prt;
 
-import com.github.forax.civilizer.vm.RT.Anchor;
+import com.github.forax.civilizer.prt.RT.Anchor;
 
 import java.lang.invoke.MethodHandles.Lookup;
 import java.util.Objects;

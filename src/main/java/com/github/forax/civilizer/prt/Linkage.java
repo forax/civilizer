@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.vm;
+package com.github.forax.civilizer.prt;
 
 import java.util.Objects;
 
