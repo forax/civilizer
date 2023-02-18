@@ -168,7 +168,7 @@ export JAVA_HOME=/path/to/jdk
 mvn package
 ```
 
-It will compile, rewrite the bytecode of any packages containing `demo` and run the tests.
+It will compile, rewrite the bytecode of any packages containing either `value` or `parametric` and run the tests.
 
 ## How to play with it ?
 
