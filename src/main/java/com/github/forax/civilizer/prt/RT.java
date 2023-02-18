@@ -553,6 +553,7 @@ public final class RT {
             default -> throw new AssertionError("unknown kind " + args[0]);
           };
         }
+        case "array" -> ((Class<?>) args[0]).arrayType();
         case "list" -> List.of(args);
         case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
         case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);

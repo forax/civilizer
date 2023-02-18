@@ -122,6 +122,26 @@ public class CondyLispTest {
   }
 
   @Test
+  public void ldcArrayType() {
+    class Foo {
+      private static final String $P0 = "array Ljava/lang/String;";
+      private static final String $P1 = "array Qcom/github/forax/civilizer/value/Complex;";
+
+      static void test() {
+        "P0".intern();
+        var v0 = RT.ldc();
+        "P1".intern();
+        var v1 = RT.ldc();
+
+        assertAll(
+            () -> assertEquals(String[].class, v0),
+            () -> assertEquals(com.github.forax.civilizer.vrt.RT.asSecondaryType(Complex.class).arrayType(), v1)
+        );
+      }
+    }
+  }
+
+  @Test
   public void condyLispSpecies() {
     class Foo {
       private static final String $P0 = "species Ljava/lang/String;";
