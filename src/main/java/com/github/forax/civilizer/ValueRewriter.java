@@ -50,8 +50,8 @@ import static org.objectweb.asm.Opcodes.POP;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 
-public final class Rewriter {
-  private Rewriter() {
+public final class ValueRewriter {
+  private ValueRewriter() {
     throw new AssertionError();
   }
 
