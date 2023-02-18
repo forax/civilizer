@@ -1,10 +1,10 @@
 package com.github.forax.civilizer.value;
 
-import com.github.forax.civilizer.runtime.NonNull;
-import com.github.forax.civilizer.runtime.Nullable;
-import com.github.forax.civilizer.runtime.RT;
-import com.github.forax.civilizer.runtime.Value;
-import com.github.forax.civilizer.runtime.ZeroDefault;
+import com.github.forax.civilizer.vrt.NonNull;
+import com.github.forax.civilizer.vrt.Nullable;
+import com.github.forax.civilizer.vrt.RT;
+import com.github.forax.civilizer.vrt.Value;
+import com.github.forax.civilizer.vrt.ZeroDefault;
 
 // $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes com/github/forax/civilizer/demo/Demo
 // $JAVA_HOME/bin/javap -verbose -private target/classes/com/github/forax/civilizer/demo/Demo.class

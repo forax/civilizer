@@ -1,10 +1,10 @@
 # civilizer
 A prototype that transforms primitive like classes to civilized classes by rewriting the bytecode.
 
-This repository contains two rewriters, one (`Rewriter`) transforms classical Java object into value class 
+This repository contains two rewriters, one (`ValueRewriter`) transforms classical Java object into value class 
 and another (`VMRewriter`) transforms generics to support specialization (so a list of values is fully specialized).
 
-## Rewriter
+## ValueRewriter
 
 ```java
   @Value record Person(@NonNull String name, @Nullable Address address, @NonNull Age age) {}

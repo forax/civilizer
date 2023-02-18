@@ -1,6 +1,6 @@
 package com.github.forax.civilizer.value;
 
-import com.github.forax.civilizer.runtime.RT;
+import com.github.forax.civilizer.vrt.RT;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertAll;

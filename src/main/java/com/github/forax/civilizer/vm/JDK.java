@@ -39,7 +39,7 @@ public final class JDK {
       erasedList = IntStream.range(0, parameters.size())
           .mapToObj(i -> {
             var parameter = parameters.get(i);
-            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.runtime.RT.isSecondaryType(clazz) ? clazz : defaults.get(i);
+            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.vrt.RT.isSecondaryType(clazz) ? clazz : defaults.get(i);
           }).toList();
     }
     var key = location.key(erasedList);

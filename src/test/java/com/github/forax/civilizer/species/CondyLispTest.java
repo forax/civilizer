@@ -115,7 +115,7 @@ public class CondyLispTest {
 
         assertAll(
             () -> assertEquals(String.class, v0),
-            () -> assertEquals(com.github.forax.civilizer.runtime.RT.asSecondaryType(Complex.class), v1)
+            () -> assertEquals(com.github.forax.civilizer.vrt.RT.asSecondaryType(Complex.class), v1)
         );
       }
     }

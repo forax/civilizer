@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.runtime;
+package com.github.forax.civilizer.vrt;
 
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;

@@ -1,10 +1,10 @@
 package com.github.forax.civilizer;
 
-import com.github.forax.civilizer.runtime.NonNull;
-import com.github.forax.civilizer.runtime.Nullable;
-import com.github.forax.civilizer.runtime.RT;
-import com.github.forax.civilizer.runtime.Value;
-import com.github.forax.civilizer.runtime.ZeroDefault;
+import com.github.forax.civilizer.vrt.NonNull;
+import com.github.forax.civilizer.vrt.Nullable;
+import com.github.forax.civilizer.vrt.RT;
+import com.github.forax.civilizer.vrt.Value;
+import com.github.forax.civilizer.vrt.ZeroDefault;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ByteVector;

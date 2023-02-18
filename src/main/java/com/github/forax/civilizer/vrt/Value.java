@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.runtime;
+package com.github.forax.civilizer.vrt;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

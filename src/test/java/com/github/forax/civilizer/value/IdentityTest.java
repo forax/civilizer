@@ -1,9 +1,8 @@
 package com.github.forax.civilizer.value;
 
-import com.github.forax.civilizer.runtime.NonNull;
-import com.github.forax.civilizer.runtime.Nullable;
-import com.github.forax.civilizer.runtime.RT;
-import org.junit.jupiter.api.Disabled;
+import com.github.forax.civilizer.vrt.NonNull;
+import com.github.forax.civilizer.vrt.Nullable;
+import com.github.forax.civilizer.vrt.RT;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;

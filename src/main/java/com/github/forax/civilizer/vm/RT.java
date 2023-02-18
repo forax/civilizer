@@ -536,7 +536,7 @@ public final class RT {
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) {
     //System.out.println("bsm_qtype " + primaryType.getName());
-    return com.github.forax.civilizer.runtime.RT.asSecondaryType(primaryType);
+    return com.github.forax.civilizer.vrt.RT.asSecondaryType(primaryType);
   }
 
   @SuppressWarnings("unused") // used by reflection
