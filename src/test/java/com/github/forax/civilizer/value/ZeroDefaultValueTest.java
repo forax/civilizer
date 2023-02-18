@@ -1,23 +1,24 @@
-package com.github.forax.civilizer.demo;
+package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
+import com.github.forax.civilizer.runtime.Value;
+import com.github.forax.civilizer.runtime.ZeroDefault;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class IdentityTest {
-  record Foo(int value) {}
+public class ZeroDefaultValueTest {
+  @ZeroDefault @Value record Foo(int value) {}
 
   static class FooContainer {
     @Nullable Foo fooNullable;
@@ -25,29 +26,35 @@ public class IdentityTest {
   }
 
   @Test
-  public void valueClass() {
-    assertFalse(Foo.class.isValue());
+  public void zeroDefaultValueClass() {
+    assertAll(
+        () -> assertTrue(Foo.class.isValue()),
+        () -> assertTrue(RT.isZeroDefault(Foo.class))
+    );
   }
 
   @Test
   public void defaultValue() {
-    assertNull(RT.defaultValue(Foo.class));
+    assertAll(
+        () -> assertNull(RT.defaultValue(Foo.class)),
+        () -> assertEquals(new Foo(0), RT.defaultValue(RT.asSecondaryType(Foo.class)))
+    );
   }
 
   @Test
   public void container() {
-     var container = new FooContainer();
-     assertAll(
-         () -> assertNull(container.fooNullable),
-         () -> assertNull(container.fooNonNull)
-     );
+    var container = new FooContainer();
+    assertAll(
+        () -> assertNull(container.fooNullable),
+        () -> assertSame(new Foo(0), container.fooNonNull)
+    );
   }
 
   @Test
   public void containerWrite() {
     var container = new FooContainer();
     container.fooNullable = null;
-    container.fooNonNull = null;
+    assertThrows(NullPointerException.class, () -> container.fooNonNull = null);
   }
 
   @Test
@@ -90,21 +97,30 @@ public class IdentityTest {
   }
 
   @Test
+  public void valueIdentityHashCode() {
+    assertEquals(
+        System.identityHashCode(new Foo(72)),
+        System.identityHashCode(new Foo(72)));
+  }
+
+  @Test
   public void valueEquality() {
-    assertNotSame(new Foo(72), new Foo(72));
+    assertSame(new Foo(72), new Foo(72));
   }
 
   @Test
   public void valueSynchronized() {
-    synchronized (new Foo(84)) {
+    assertThrows(IllegalMonitorStateException.class, () -> {
+      synchronized (new Foo(84)) {
         // empty
-    }
-    // Ok !
+      }
+    });
   }
 
   @Test
   public void valueWeakReference() {
-    new WeakReference<>(new Foo(84));
-    // OK !
+    assertThrows(IdentityException.class, () -> {
+      new WeakReference<>(new Foo(84));
+    });
   }
 }

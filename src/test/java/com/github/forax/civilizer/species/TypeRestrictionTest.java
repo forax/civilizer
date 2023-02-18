@@ -1,9 +1,8 @@
 package com.github.forax.civilizer.species;
 
-import com.github.forax.civilizer.demo.Complex;
+import com.github.forax.civilizer.value.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.TypeRestriction;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,7 +50,7 @@ public class TypeRestrictionTest {
   @Test
   public void initZeroDefaultValue() {
     class Test {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
@@ -68,7 +67,7 @@ public class TypeRestrictionTest {
   @Test
   public void putFieldZeroDefaultValue() {
     class Test {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {

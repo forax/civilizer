@@ -1,10 +1,9 @@
 package com.github.forax.civilizer.species;
 
-import com.github.forax.civilizer.demo.Complex;
+import com.github.forax.civilizer.value.Complex;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.TypeRestriction;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Array;
@@ -54,7 +53,7 @@ public class ValueSpecializedTest {
     }
   }
 
-  private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
+  private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
   private static final String $P1 = "linkage P0;";
 
   @Test
@@ -122,7 +121,7 @@ public class ValueSpecializedTest {
   @Test
   public void specializedComplexDefaultValue() {
     class TestWithComplex {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       static void test() {

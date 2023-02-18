@@ -1,10 +1,9 @@
-package com.github.forax.civilizer.demo;
+package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
 import com.github.forax.civilizer.runtime.Value;
-import com.github.forax.civilizer.runtime.ZeroDefault;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ZeroDefaultValueTest {
-  @ZeroDefault @Value record Foo(int value) {}
+public class ValueTest {
+  @Value record Foo(int value) {}
 
   static class FooContainer {
     @Nullable Foo fooNullable;
@@ -26,35 +25,29 @@ public class ZeroDefaultValueTest {
   }
 
   @Test
-  public void zeroDefaultValueClass() {
-    assertAll(
-        () -> assertTrue(Foo.class.isValue()),
-        () -> assertTrue(RT.isZeroDefault(Foo.class))
-    );
+  public void valueClass() {
+    assertTrue(Foo.class.isValue());
   }
 
   @Test
   public void defaultValue() {
-    assertAll(
-        () -> assertNull(RT.defaultValue(Foo.class)),
-        () -> assertEquals(new Foo(0), RT.defaultValue(RT.asSecondaryType(Foo.class)))
-    );
+    assertNull(RT.defaultValue(Foo.class));
   }
 
   @Test
   public void container() {
-    var container = new FooContainer();
-    assertAll(
-        () -> assertNull(container.fooNullable),
-        () -> assertSame(new Foo(0), container.fooNonNull)
-    );
+     var container = new FooContainer();
+     assertAll(
+         () -> assertNull(container.fooNullable),
+         () -> assertNull(container.fooNonNull)
+     );
   }
 
   @Test
   public void containerWrite() {
     var container = new FooContainer();
     container.fooNullable = null;
-    assertThrows(NullPointerException.class, () -> container.fooNonNull = null);
+    container.fooNonNull = null;
   }
 
   @Test

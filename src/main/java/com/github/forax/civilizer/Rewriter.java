@@ -573,8 +573,8 @@ public final class Rewriter {
   }
 
   public static void main(String[] args) throws IOException {
-    var main = classes(Path.of("target/classes"), "demo");
-    var test = classes(Path.of("target/test-classes"), "demo");
+    var main = classes(Path.of("target/classes"), "value");
+    var test = classes(Path.of("target/test-classes"), "value");
     var classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);

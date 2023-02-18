@@ -1,12 +1,11 @@
 package com.github.forax.civilizer.species;
 
-import com.github.forax.civilizer.demo.Complex;
+import com.github.forax.civilizer.value.Complex;
 import com.github.forax.civilizer.vm.Linkage;
 import com.github.forax.civilizer.vm.Location;
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.RT;
 import com.github.forax.civilizer.vm.Species;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -105,7 +104,7 @@ public class CondyLispTest {
   public void ldcReferenceType() {
     class Foo {
       private static final String $P0 = "Ljava/lang/String;";
-      private static final String $P1 = "Qcom/github/forax/civilizer/demo/Complex;";
+      private static final String $P1 = "Qcom/github/forax/civilizer/value/Complex;";
 
 
       static void test() {

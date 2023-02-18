@@ -1,23 +1,23 @@
-package com.github.forax.civilizer.demo;
+package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.runtime.NonNull;
 import com.github.forax.civilizer.runtime.Nullable;
 import com.github.forax.civilizer.runtime.RT;
-import com.github.forax.civilizer.runtime.Value;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ValueTest {
-  @Value record Foo(int value) {}
+public class IdentityTest {
+  record Foo(int value) {}
 
   static class FooContainer {
     @Nullable Foo fooNullable;
@@ -26,7 +26,7 @@ public class ValueTest {
 
   @Test
   public void valueClass() {
-    assertTrue(Foo.class.isValue());
+    assertFalse(Foo.class.isValue());
   }
 
   @Test
@@ -90,30 +90,21 @@ public class ValueTest {
   }
 
   @Test
-  public void valueIdentityHashCode() {
-    assertEquals(
-        System.identityHashCode(new Foo(72)),
-        System.identityHashCode(new Foo(72)));
-  }
-
-  @Test
   public void valueEquality() {
-    assertSame(new Foo(72), new Foo(72));
+    assertNotSame(new Foo(72), new Foo(72));
   }
 
   @Test
   public void valueSynchronized() {
-    assertThrows(IllegalMonitorStateException.class, () -> {
-      synchronized (new Foo(84)) {
+    synchronized (new Foo(84)) {
         // empty
-      }
-    });
+    }
+    // Ok !
   }
 
   @Test
   public void valueWeakReference() {
-    assertThrows(IdentityException.class, () -> {
-      new WeakReference<>(new Foo(84));
-    });
+    new WeakReference<>(new Foo(84));
+    // OK !
   }
 }

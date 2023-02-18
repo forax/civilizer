@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.demo;
+package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.runtime.Value;
 import com.github.forax.civilizer.runtime.ZeroDefault;
