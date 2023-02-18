@@ -1,8 +1,7 @@
-package com.github.forax.civilizer.species;
+package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.vm.Parametric;
 import com.github.forax.civilizer.vm.TypeRestriction;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

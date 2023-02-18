@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.species;
+package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.value.Complex;
 import com.github.forax.civilizer.vm.Linkage;
@@ -216,7 +216,7 @@ public class CondyLispTest {
   public void ldcClassDataNoArgument() {
     @Parametric("P0")
     class Foo<T> {
-      private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
+      private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
       private static final String $P1 = "anchor P0;";
 
       Object value() {
@@ -231,7 +231,7 @@ public class CondyLispTest {
 
   @Parametric("P0")
   record Data<T>() {
-    private static final String $P0 = "mh Lcom/github/forax/civilizer/species/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
+    private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/vm/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "linkage 77";
 

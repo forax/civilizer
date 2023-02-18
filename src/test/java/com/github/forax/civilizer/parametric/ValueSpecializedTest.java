@@ -1,4 +1,4 @@
-package com.github.forax.civilizer.species;
+package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.value.Complex;
 import com.github.forax.civilizer.vm.Parametric;

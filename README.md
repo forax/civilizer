@@ -147,7 +147,7 @@ All the specialized operations that takes a Linkage as parameter are re-written 
 with the correspondant constant pool constant as parameter.
 The values of the type arguments inside the constant pools are computed when asked.
 
-There are more [examples in the tests](src/test/java/com/github/forax/civilizer/species/)
+There are more [examples in the tests](src/test/java/com/github/forax/civilizer/parametric/)
 
 Parametric class instantiation works, static and instance parametric methods instantiation works,
 specialization of super (with `@SuperType`), interfaces, and default methods works,
