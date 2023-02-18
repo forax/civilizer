@@ -2,7 +2,8 @@
 A prototype that transforms primitive like classes to civilized classes by rewriting the bytecode.
 
 This repository contains two rewriters, one (`ValueRewriter`) transforms classical Java object into value class 
-and another (`VMRewriter`) transforms generics to support specialization (so a list of values is fully specialized).
+and another (`ParametricRewriter`) transforms generics to support parametric generics
+(so a list of values is fully specialized).
 
 ## ValueRewriter
 
@@ -43,7 +44,7 @@ Compared to a classical @NonNull, this one has some teeth, when declared on a pa
 This behavior is I believe the same as in Kotlin.
 
 
-## VMRewriter
+## ParametricRewriter
 
 This rewriter allows to declare new constant pool constants (that starts with `$P`) and to specialize some operations/opcodes.
 
