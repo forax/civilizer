@@ -117,8 +117,8 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
    All the creation of the kiddy pool classes, all the type checking of the TypeRestrictions are deferred at runtime,
    see RT.
  */
-public final class VMRewriter {
-  private VMRewriter() {
+public final class ParametricRewriter {
+  private ParametricRewriter() {
     throw new AssertionError();
   }
 

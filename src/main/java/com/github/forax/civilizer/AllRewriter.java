@@ -7,6 +7,6 @@ public class AllRewriter {
     System.out.println("--- value ---");
     ValueRewriter.main(args);
     System.out.println("--- parametric ---");
-    VMRewriter.main(args);
+    ParametricRewriter.main(args);
   }
 }
