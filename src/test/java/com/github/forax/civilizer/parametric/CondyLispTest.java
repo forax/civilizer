@@ -228,6 +228,21 @@ public class CondyLispTest {
     }
   }
 
+  @Test
+  public void condyLispEval() {
+    class Foo {
+      private static final String $P0 = "mh Ljava/lang/Integer; 'sum (II)I";
+      private static final String $P1 = "eval P0; 2 3";
+
+      static void test() {
+        "P1".intern();
+        var value = RT.ldc();
+
+        assertEquals(5, value);
+      }
+    }
+  }
+
   private static Object bsmValue(Location location, Integer value) {
     return location.specialize(value == null ? 42 : value);
   }

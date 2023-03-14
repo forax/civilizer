@@ -554,6 +554,7 @@ public final class RT {
           };
         }
         case "array" -> ((Class<?>) args[0]).arrayType();
+        case "eval" -> ((MethodHandle) args[0]).invokeWithArguments(Arrays.stream(args).skip(1).toArray());
         case "list" -> List.of(args);
         case "list.get" -> ((List<?>) args[0]).get((int) args[1]);
         case "species" -> new Species((Class<?>) args[0], args.length == 1 ? null: args[1]);

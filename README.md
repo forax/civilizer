@@ -53,6 +53,7 @@ transforms them to constant (constant dynamic constant).
 Each constant is initialized with a kind of LISP (condy-LISP) that recognizes the instructions:
 - `anchor` &lt;ref&gt; &lt;parent-ref?&gt;, parameters of the parametric class/method,
 - `array` &lt;ref&gt;, creates an array type,
+- `eval` &lt;mh&gt; &lt;args&lt;..., evaluate a method handle with arguments,
 - `linkage` &lt;ref&gt;  specifies a parameters of one of the parametrized opcodes,
 - `list` &lt;args&gt;... creates a list,
 - `list.get` &lt;list&gt; &lt;index&gt; extracts the nth item of a list,
