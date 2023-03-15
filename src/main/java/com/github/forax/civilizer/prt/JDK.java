@@ -14,7 +14,9 @@ public final class JDK {
     throw new AssertionError();
   }
 
-  private static final ConcurrentHashMap<Location.Key, Object> CACHE = new ConcurrentHashMap<>();
+  private record SpecializationKey(Location.Key key, Object parameters) {}
+
+  private static final ConcurrentHashMap<SpecializationKey, Object> CACHE = new ConcurrentHashMap<>();
 
   @SuppressWarnings("unused")  // used by reflection
   public static Object erase(Object locationObj, Object parametersObj, Object defaultsObj) {
@@ -42,7 +44,7 @@ public final class JDK {
             return parameter instanceof Class<?> clazz && com.github.forax.civilizer.vrt.RT.isSecondaryType(clazz) ? clazz : defaults.get(i);
           }).toList();
     }
-    var key = location.key(erasedList);
+    var key = new SpecializationKey(location.key(), erasedList);
     return CACHE.computeIfAbsent(key, k -> location.specialize(erasedList));
   }
 
@@ -56,7 +58,7 @@ public final class JDK {
   public static Object identity(Location location, Object parameters) {
     Objects.requireIdentity(location, "location is null");
     Objects.requireIdentity(parameters, "parameters is null");
-    var key = location.key(parameters);
+    var key = new SpecializationKey(location.key(), parameters);
     return CACHE.computeIfAbsent(key, k -> location.specialize(parameters));
   }
 }

@@ -11,15 +11,15 @@ import java.util.Objects;
  */
 public final class Location {
   /**
-   * Key that can be used to store the information corresponding to a parametric class/method with its parameters.
-   *
-   * #see {@link Location#key(Object)}
+   * Key that can be used to store the information corresponding to a parametric class/method.
+   * <p>
+   * #see {@link Location#key()}
    */
   public sealed interface Key {}
 
-  // TODO use weak-ref for classes here: not easy given that classParameters may also contain refs on java.lang.Class
-  private record ClassKey(Class<?> raw, Object classParameters) implements Key {}
-  private record MethodKey(Class<?> raw, Object classParameters, String name, String descriptor, Object methodParameters) implements Key {}
+  // TODO use weak-ref for classes here
+  private record ClassKey(Class<?> raw) implements Key {}
+  private record MethodKey(Class<?> raw, Object classParameters, String name, String descriptor) implements Key {}
 
   private final Lookup speciesLookup;
   private final Class<?> raw;
@@ -52,16 +52,14 @@ public final class Location {
   }
 
   /**
-   * Returns a key that can be safety used to represent a reference to this location and parameters.
-   * @param parameters the parameters
-   * @return a key that can be safety used to represent a reference to this location and parameters.
+   * Returns a key that can be safety used to represent a reference to this location.
+   * @return a key that can be safety used to represent a reference to this location.
    */
-  public Key key(Object parameters) {
-    Objects.requireNonNull(parameters, "parameters is null");
+  public Key key() {
     if (name != null) {
-      return new MethodKey(raw, classParameters, name, descriptor, parameters);
+      return new MethodKey(raw, classParameters, name, descriptor);
     }
-    return new ClassKey(raw, parameters);
+    return new ClassKey(raw);
   }
 
   /**
