@@ -170,6 +170,9 @@ public final class ValueRewriter {
 
       @Override
       public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        if ((access & ACC_VALUE) != 0) {
+          throw new AssertionError("can not rewrite a class that is already a value class, try mvn clean");
+        }
         internalName = name;
         this.superName = superName;
         typeKind = TypeKind.IDENTITY;
