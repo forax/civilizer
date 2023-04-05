@@ -149,6 +149,9 @@ public final class ParametricRewriter {
     }
   }
 
+
+  private static final int ACC_VALUE = 0x0040;
+
   private static final String RT_INTERNAL = RT.class.getName().replace('.', '/');
   private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_ldc",
@@ -216,7 +219,7 @@ public final class ParametricRewriter {
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
 
-  private static ClassData analyze(byte[] buffer) {
+  private static Optional<ClassData> analyze(byte[] buffer) {
     record ProtoCondy(String condyName, String action, List<String> args) {}
 
     var anchorKindMap = new HashMap<String, AnchorKind>();
@@ -228,6 +231,9 @@ public final class ParametricRewriter {
     var methodRestrictionMap = new HashMap<Method, String>();
 
     var reader = new ClassReader(buffer);
+    if ((reader.getAccess() & ACC_VALUE) != 0) {
+      return Optional.empty();
+    }
     var cv = new ClassVisitor(ASM9) {
       private static final String PARAMETRIC_DESCRIPTOR = "L" + Parametric.class.getName().replace('.', '/') + ";";
       private static final String SUPER_TYPE_DESCRIPTOR = "L" + SuperType.class.getName().replace('.', '/') + ";";
@@ -524,27 +530,34 @@ public final class ParametricRewriter {
     };
     reader.accept(cv, 0);
 
-    return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap);
+    return Optional.of(new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap));
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
     for(var path: classes) {
       try(var input = Files.newInputStream(path)) {
         System.out.println("rewrite " + path);
-        var data = rewrite(input.readAllBytes(), analysis);
-        Files.write(path, data);
+        var dataOpt = rewrite(input.readAllBytes(), analysis);
+        if (dataOpt.isEmpty()) {
+          System.out.println("  skip as value class");
+          continue;
+        }
+        Files.write(path, dataOpt.orElseThrow());
       }
     }
   }
 
 
-  private static byte[] rewrite(byte[] buffer, Analysis analysis) {
+  private static Optional<byte[]> rewrite(byte[] buffer, Analysis analysis) {
     var reader = new ClassReader(buffer);
     var isInterface = (reader.getAccess() & ACC_INTERFACE) != 0;
     var internalName = reader.getClassName();
     var supername = reader.getSuperName();
     var classDataMap = analysis.classDataMap;
     var classData = analysis.classDataMap.get(internalName);
+    if (classData == null) {
+      return Optional.empty();
+    }
     var writer = new ClassWriter(0);
     var cv = new ClassVisitor(ASM9, writer) {
       private CondyInfo findCondyInfo(String ldcConstant) {
@@ -912,7 +925,7 @@ public final class ParametricRewriter {
     };
     reader.accept(cv, 0);
 
-    return writer.toByteArray();
+    return Optional.of(writer.toByteArray());
   }
 
 
@@ -923,28 +936,29 @@ public final class ParametricRewriter {
       try (var input = Files.newInputStream(path)) {
         var bytecode = input.readAllBytes();
         System.out.println("analyze " + path);
-        var classData = analyze(bytecode);
-        classDataMap.put(classData.internalName, classData);
+        var classDataOpt = analyze(bytecode);
+        classDataOpt.ifPresent(classData -> {
+          classDataMap.put(classData.internalName, classData);
+        });
       }
     }
-
     return new Analysis(classDataMap);
   }
 
-  private static List<Path> classes(Path folder, String including) throws IOException {
+  private static List<Path> classes(Path folder) throws IOException {
     if (!Files.exists(folder)) {
       return List.of();
     }
     try(var paths = Files.walk(folder)) {
       return paths
-          .filter(p -> p.toString().contains(including) && p.toString().endsWith(".class"))
+          .filter(p -> p.toString().endsWith(".class"))
           .toList();
     }
   }
 
   public static void main(String[] args) throws IOException {
-    var main = classes(Path.of("target/classes"), "parametric");
-    var test = classes(Path.of("target/test-classes"), "parametric");
+    var main = classes(Path.of("target/classes"));
+    var test = classes(Path.of("target/test-classes"));
     var classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);

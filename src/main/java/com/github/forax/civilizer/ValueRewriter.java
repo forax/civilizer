@@ -564,20 +564,20 @@ public final class ValueRewriter {
     };
   }
 
-  private static List<Path> classes(Path folder, String including) throws IOException {
+  private static List<Path> classes(Path folder) throws IOException {
     if (!Files.exists(folder)) {
       return List.of();
     }
     try(var paths = Files.walk(folder)) {
       return paths
-          .filter(p -> p.toString().contains(including) && p.toString().endsWith(".class"))
+          .filter(p -> p.toString().endsWith(".class"))
           .toList();
     }
   }
 
   public static void main(String[] args) throws IOException {
-    var main = classes(Path.of("target/classes"), "value");
-    var test = classes(Path.of("target/test-classes"), "value");
+    var main = classes(Path.of("target/classes"));
+    var test = classes(Path.of("target/test-classes"));
     var classes = Stream.concat(main.stream(), test.stream()).toList();
 
     var analysis = analyze(classes);
