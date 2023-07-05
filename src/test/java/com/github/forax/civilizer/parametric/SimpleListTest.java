@@ -2,12 +2,14 @@ package com.github.forax.civilizer.parametric;
 
 import com.github.forax.civilizer.prt.Parametric;
 import com.github.forax.civilizer.prt.TypeRestriction;
+import com.github.forax.civilizer.value.Complex;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class SimpleListTest {
   @Parametric("P1")
@@ -133,5 +135,17 @@ public class SimpleListTest {
     var element = list.get(0);
 
     assertEquals("baz", element);
+  }
+
+  private static final String $P_complex_0 = "list Qcom/github/forax/civilizer/value/Complex;";
+  private static final String $P_complex_1 = "linkage P_complex_0;";
+
+  @Test
+  public void incorrectAdd() {
+    // demonstrates that adding the wrong type to a generic list of value types fails.
+    "P_complex_1".intern();
+    var list = SimpleList.<Complex>of();
+    list.add(new Complex(3, 1));
+    assertThrows(ClassCastException.class, () -> ((SimpleList)list).add("42"));
   }
 }
