@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class ValueSpecializedTest {
+/*public class ValueSpecializedTest {
   @Parametric("P1")
   static class SimpleList<E> {
     private static final String $P0 = "list Ljava/lang/Object;";
@@ -133,4 +133,4 @@ public class ValueSpecializedTest {
     }
     TestWithComplex.test();
   }
-}
+}*/

@@ -12,21 +12,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RTTest {
   @Test
-  public void asSecondaryType() {
+  public void isValue() {
     assertAll(
-        () -> assertThrows(IllegalArgumentException.class, () -> RT.asSecondaryType(int.class)),
-        () -> assertThrows(UnsupportedOperationException.class, () -> RT.asSecondaryType(String.class)),
-        () -> assertTrue(RT.asSecondaryType(Complex.class).isValue())
+        () -> assertFalse(RT.isValue(int.class)),
+        () -> assertFalse(RT.isValue(String.class)),
+        () -> assertTrue(RT.isValue(Complex.class))
     );
   }
 
   @Test
-  public void isSecondaryType() {
+  public void isZeroDefault() {
     assertAll(
-        () -> assertFalse(RT.isSecondaryType(int.class)),
-        () -> assertFalse(RT.isSecondaryType(String.class)),
-        () -> assertFalse(RT.isSecondaryType(Complex.class)),
-        () -> assertTrue(RT.isSecondaryType(RT.asSecondaryType(Complex.class)))
+        () -> assertFalse(RT.isZeroDefault(int.class)),
+        () -> assertFalse(RT.isZeroDefault(String.class)),
+        () -> assertTrue(RT.isZeroDefault(Complex.class))
     );
   }
 
@@ -35,8 +34,7 @@ public class RTTest {
     assertAll(
         () -> assertEquals(0, RT.defaultValue(int.class)),
         () -> assertNull(RT.defaultValue(String.class)),
-        () -> assertNull(RT.defaultValue(Complex.class)),
-        () -> assertEquals(new Complex(0.0, 0.0), RT.defaultValue(RT.asSecondaryType(Complex.class)))
+        () -> assertEquals(new Complex(0,0), RT.defaultValue(Complex.class))
     );
   }
 
@@ -44,5 +42,11 @@ public class RTTest {
   public void newNonNullArray() {
     var array = RT.newNonNullArray(Complex.class, 3);
     assertThrows(NullPointerException.class, () -> array[1] = null);
+  }
+
+  @Test
+  public void isNullRestrictedArray() {
+    var array = RT.newNonNullArray(Complex.class, 3);
+    assertTrue(RT.isNullRestrictedArray(array));
   }
 }

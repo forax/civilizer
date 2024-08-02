@@ -35,7 +35,7 @@ public class ArrayTest {
 
   @Test
   public void arrayOfZeroBasedClas() {
-    @ZeroDefault @Value record ZeroDefaultFoo() {}
+    @ZeroDefault @Value class ZeroDefaultFoo {}
 
     var array = new ZeroDefaultFoo[3];
     assertAll(
@@ -46,7 +46,7 @@ public class ArrayTest {
 
   @Test
   public void arrayOfNonNullZeroBasedClas() {
-    @ZeroDefault @Value record ZeroDefaultFoo() {}
+    @ZeroDefault @Value class ZeroDefaultFoo {}
 
     var array = RT.newNonNullArray(ZeroDefaultFoo.class, 3);
     assertAll(

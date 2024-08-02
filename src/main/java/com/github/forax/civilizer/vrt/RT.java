@@ -1,5 +1,6 @@
 package com.github.forax.civilizer.vrt;
 
+import java.lang.annotation.Annotation;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
@@ -8,6 +9,8 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.TypeDescriptor;
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.runtime.ObjectMethods;
 
 public final class RT {
@@ -15,82 +18,97 @@ public final class RT {
     throw new AssertionError();
   }
 
-  private static final int ACC_PRIMITIVE = 0x0800;  // see jdk.internal.value.PrimitiveClass
+  private static final int ACC_IDENTITY = 0x0020;
 
-  public static boolean isZeroDefault(Class<?> clazz) {
-    return (clazz.getModifiers() & ACC_PRIMITIVE) != 0;
+  public static boolean isValue(Class<?> type) {
+    //return (type.getModifiers() & ACC_IDENTITY) == 0;
+    return type.isValue();
   }
 
+  private static final Method IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
+      NEW_NULL_RESTRICTED_ARRAY, IS_NULL_RESTRICTED_ARRAY;
 
-
-  public static Class<?> asSecondaryType(Class<?> type) {
-    if (type.isPrimitive()) {
-      throw new IllegalArgumentException("component is primitive");
+  static {
+    Class<?> valueClass;
+    try {
+      valueClass = Class.forName("jdk.internal.value.ValueClass");
+    } catch (ClassNotFoundException e) {
+      throw new AssertionError(e);
     }
-    return MethodType.fromMethodDescriptorString("()Q" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
+    try {
+      IS_IMPLICITLY_CONSTRUCTIBLE = valueClass.getMethod("isImplicitlyConstructible", Class.class);
+      ZERO_INSTANCE = valueClass.getMethod("zeroInstance", Class.class);
+      NEW_NULL_RESTRICTED_ARRAY = valueClass.getMethod("newNullRestrictedArray", Class.class, int.class);
+      IS_NULL_RESTRICTED_ARRAY = valueClass.getMethod("isNullRestrictedArray", Object.class);
+    } catch (NoSuchMethodException e) {
+      throw new AssertionError(e);
+    }
   }
 
-  private static Class<?> asPrimaryType(Class<?> type) {
-    return MethodType.fromMethodDescriptorString("()L" + type.getName().replace('.', '/') + ";", type.getClassLoader()).returnType();
-  }
-
-  public static boolean isSecondaryType(Class<?> type) {
-    if (!isZeroDefault(type)) {
+  public static boolean isZeroDefault(Class<?> type) {
+    if (!isValue(type)) {
       return false;
     }
-    return asPrimaryType(type) != type;
+    try {
+      return (boolean) IS_IMPLICITLY_CONSTRUCTIBLE.invoke(null, type);
+    } catch (IllegalAccessException | InvocationTargetException e) {
+      throw new AssertionError(e);
+    }
   }
 
   @SuppressWarnings("unchecked")
   public static <T> T defaultValue(Class<T> type) {
-    return (T) Array.get(Array.newInstance(type,1), 0);
+    if (!isZeroDefault(type)) {
+      return (T) Array.get(Array.newInstance(type, 1), 0);
+    }
+    try {
+      return (T) ZERO_INSTANCE.invoke(null, type);
+    } catch (IllegalAccessException | InvocationTargetException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+
+
+  @SuppressWarnings("unchecked")
+  public static <T> T[] newNonNullArray(Class<T> component, int length) {
+    try {
+      return (T[]) NEW_NULL_RESTRICTED_ARRAY.invoke(null, component, length);
+    } catch (IllegalAccessException | InvocationTargetException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  public static boolean isNullRestrictedArray(Object array) {
+    try {
+      return (boolean) IS_NULL_RESTRICTED_ARRAY.invoke(null, array);
+    }  catch (IllegalAccessException | InvocationTargetException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  /*
+  public static boolean isZeroDefault(Class<?> type) {
+    if (!isValue(type)) {
+      return false;
+    }
+    return jdk.internal.value.ValueClass.isImplicitlyConstructible(type);
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T defaultValue(Class<T> type) {
+    if (!isZeroDefault(type)) {
+      return (T) Array.get(Array.newInstance(type, 1), 0);
+    }
+    return jdk.internal.value.ValueClass.zeroInstance(type);
   }
 
   @SuppressWarnings("unchecked")
   public static <T> T[] newNonNullArray(Class<T> component, int length) {
-    return (T[]) Array.newInstance(asSecondaryType(component), length);
+    return (T[]) jdk.internal.value.ValueClass.newNullRestrictedArray(component, length);
   }
 
-  // bootstrap methods
-
-  public static CallSite bsm_getfield(Lookup lookup, String name, MethodType methodType) throws NoSuchFieldException, IllegalAccessException {
-    var owner = methodType.parameterType(0);
-    var desc = methodType.returnType();
-    MethodHandle mh;
-    try {
-      mh = lookup.findGetter(owner, name, desc);
-    } catch (NoSuchFieldException e) {
-      mh = lookup.findGetter(owner, name, asSecondaryType(desc));
-    }
-    return new ConstantCallSite(mh.asType(methodType));
-  }
-
-  public static CallSite bsm_putfield(Lookup lookup, String name, MethodType methodType) throws NoSuchFieldException, IllegalAccessException {
-    var owner = methodType.parameterType(0);
-    var desc = methodType.parameterType(1);
-    MethodHandle mh;
-    try {
-      mh = lookup.findSetter(owner, name, desc);
-    } catch (NoSuchFieldException e) {
-      mh = lookup.findSetter(owner, name, asSecondaryType(desc));
-    }
-    return new ConstantCallSite(mh.asType(methodType));
-  }
-
-  public static Object bsm_record(MethodHandles.Lookup lookup, String methodName, TypeDescriptor type, Class<?> recordClass, String names, MethodHandle... getters) throws Throwable {
-     switch (methodName) {
-       case "equals", "hashCode", "toString" -> {}
-       default -> throw new LinkageError("unknown method" + methodName + " " + type);
-     }
-     if (!(type instanceof MethodType methodType)) {
-       throw new LinkageError("unknown type" + methodName + " " + type);
-     }
-     if (isZeroDefault(recordClass)) {
-       var newMethodType = methodType.changeParameterType(0, asSecondaryType(recordClass));
-       var callsite = (CallSite) ObjectMethods.bootstrap(lookup, methodName, newMethodType, recordClass, names, getters);
-       var mh = callsite.dynamicInvoker();
-       return new ConstantCallSite(mh.asType(methodType));
-     }
-     return ObjectMethods.bootstrap(lookup, methodName, methodType, recordClass, names, getters);
-  }
+  public static boolean isNullRestrictedArray(Object array) {
+    return jdk.internal.value.ValueClass.isNullRestrictedArray(array);
+  }*/
 }

@@ -25,7 +25,7 @@ public class IdentityTest {
 
   @Test
   public void valueClass() {
-    assertFalse(Foo.class.isValue());
+    assertFalse(RT.isValue(Foo.class));
   }
 
   @Test

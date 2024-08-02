@@ -29,8 +29,8 @@ public final class JDK {
   @SuppressWarnings("WeakerAccess")  // used by reflection
   public static Object erase(Location location, List<?> parameters, List<?> defaults) {
     //System.out.println("erase " + location + " " + parameters + " " + defaults);
-    Objects.requireIdentity(location, "location is null");
-    Objects.requireIdentity(defaults, "defaults is null");
+    //Objects.requireIdentity(location, "location is null");
+    //Objects.requireIdentity(defaults, "defaults is null");
     List<?> erasedList;
     if (parameters == null) {
       erasedList = defaults;
@@ -41,7 +41,7 @@ public final class JDK {
       erasedList = IntStream.range(0, parameters.size())
           .mapToObj(i -> {
             var parameter = parameters.get(i);
-            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.vrt.RT.isSecondaryType(clazz) ? clazz : defaults.get(i);
+            return parameter instanceof Class<?> clazz && com.github.forax.civilizer.vrt.RT.isValue(clazz) ? clazz : defaults.get(i);
           }).toList();
     }
     var key = new SpecializationKey(location.key(), erasedList);
@@ -56,8 +56,8 @@ public final class JDK {
 
   @SuppressWarnings("WeakerAccess")  // used by reflection
   public static Object identity(Location location, Object parameters) {
-    Objects.requireIdentity(location, "location is null");
-    Objects.requireIdentity(parameters, "parameters is null");
+    //Objects.requireIdentity(location, "location is null");
+    //Objects.requireIdentity(parameters, "parameters is null");
     var key = new SpecializationKey(location.key(), parameters);
     return CACHE.computeIfAbsent(key, k -> location.specialize(parameters));
   }

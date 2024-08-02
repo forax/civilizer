@@ -8,6 +8,7 @@ import com.github.forax.civilizer.vrt.ZeroDefault;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,7 +18,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ZeroDefaultValueTest {
-  @ZeroDefault @Value record Foo(int value) {}
+  @ZeroDefault @Value static class Dummy { }
+
+  @ZeroDefault @Value static class Foo {
+    private final int value;
+
+    public Foo(int value) {
+      this.value = value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Foo foo && value == foo.value;
+    }
+
+    @Override
+    public int hashCode() {
+      return value;
+    }
+  }
 
   static class FooContainer {
     @Nullable Foo fooNullable;
@@ -25,7 +44,15 @@ public class ZeroDefaultValueTest {
   }
 
   @Test
-  public void zeroDefaultValueClass() {
+  public void zeroDefaultDummyValueClass() {
+    assertAll(
+        () -> assertTrue(Dummy.class.isValue()),
+        () -> assertTrue(RT.isZeroDefault(Dummy.class))
+    );
+  }
+
+  @Test
+  public void zeroDefaultFooValueClass() {
     assertAll(
         () -> assertTrue(Foo.class.isValue()),
         () -> assertTrue(RT.isZeroDefault(Foo.class))
@@ -34,10 +61,7 @@ public class ZeroDefaultValueTest {
 
   @Test
   public void defaultValue() {
-    assertAll(
-        () -> assertNull(RT.defaultValue(Foo.class)),
-        () -> assertEquals(new Foo(0), RT.defaultValue(RT.asSecondaryType(Foo.class)))
-    );
+    assertEquals(new Foo(0), RT.defaultValue(Foo.class));
   }
 
   @Test
@@ -107,9 +131,19 @@ public class ZeroDefaultValueTest {
     assertSame(new Foo(72), new Foo(72));
   }
 
+  private static final Class<? extends Throwable> IDENTITY_EXCEPTION;
+  static {
+    try {
+      IDENTITY_EXCEPTION = Class.forName("java.lang.IdentityException")
+          .asSubclass(Throwable.class);
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   public void valueSynchronized() {
-    assertThrows(IllegalMonitorStateException.class, () -> {
+    assertThrows(IDENTITY_EXCEPTION, () -> {
       synchronized (new Foo(84)) {
         // empty
       }
@@ -118,7 +152,7 @@ public class ZeroDefaultValueTest {
 
   @Test
   public void valueWeakReference() {
-    assertThrows(IdentityException.class, () -> {
+    assertThrows(IDENTITY_EXCEPTION, () -> {
       new WeakReference<>(new Foo(84));
     });
   }

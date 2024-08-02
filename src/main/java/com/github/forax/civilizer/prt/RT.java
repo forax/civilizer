@@ -452,7 +452,7 @@ public final class RT {
 
     if (constant instanceof Linkage linkage) {
       var specializedClass = ((Class<?>) linkage.parameters()).arrayType();
-      var newArray = MethodHandles.arrayConstructor(specializedClass);
+      var newArray = MethodHandles.arrayConstructor(specializedClass);  //FIXME, should create a restricted array if necessary
       var target = newArray.asType(type);
       return new ConstantCallSite(target);
     }
@@ -536,7 +536,10 @@ public final class RT {
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) {
     //System.out.println("bsm_qtype " + primaryType.getName());
-    return com.github.forax.civilizer.vrt.RT.asSecondaryType(primaryType);
+    if (!com.github.forax.civilizer.vrt.RT.isZeroDefault(primaryType)) {
+      throw new IllegalArgumentException("primary type is not a zero default value " + primaryType.getName());
+    }
+    return primaryType;
   }
 
   @SuppressWarnings("unused") // used by reflection

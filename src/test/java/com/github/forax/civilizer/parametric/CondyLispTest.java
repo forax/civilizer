@@ -13,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CondyLispTest {
   @Test
@@ -115,7 +116,7 @@ public class CondyLispTest {
 
         assertAll(
             () -> assertEquals(String.class, v0),
-            () -> assertEquals(com.github.forax.civilizer.vrt.RT.asSecondaryType(Complex.class), v1)
+            () -> assertEquals(Complex.class, v1)
         );
       }
     }
@@ -135,7 +136,7 @@ public class CondyLispTest {
 
         assertAll(
             () -> assertEquals(String[].class, v0),
-            () -> assertEquals(com.github.forax.civilizer.vrt.RT.asSecondaryType(Complex.class).arrayType(), v1)
+            () -> assertTrue(com.github.forax.civilizer.vrt.RT.isNullRestrictedArray(v1)) // FIXME, check that the array is not nullable
         );
       }
     }

@@ -23,9 +23,12 @@ public class ValueTest {
     @NonNull Foo fooNonNull;
   }
 
+  private static final int ACC_IDENTITY = 0x0020;
+
   @Test
   public void valueClass() {
-    assertTrue(Foo.class.isValue());
+    assertTrue((Foo.class.getModifiers() & ACC_IDENTITY) == 0);
+    assertTrue(RT.isValue(Foo.class));
   }
 
   @Test
@@ -100,9 +103,19 @@ public class ValueTest {
     assertSame(new Foo(72), new Foo(72));
   }
 
+  private static final Class<? extends Throwable> IDENTITY_EXCEPTION;
+  static {
+    try {
+      IDENTITY_EXCEPTION = Class.forName("java.lang.IdentityException")
+          .asSubclass(Throwable.class);
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   public void valueSynchronized() {
-    assertThrows(IllegalMonitorStateException.class, () -> {
+    assertThrows(IDENTITY_EXCEPTION, () -> {
       synchronized (new Foo(84)) {
         // empty
       }
@@ -111,7 +124,7 @@ public class ValueTest {
 
   @Test
   public void valueWeakReference() {
-    assertThrows(IdentityException.class, () -> {
+    assertThrows(IDENTITY_EXCEPTION, () -> {
       new WeakReference<>(new Foo(84));
     });
   }

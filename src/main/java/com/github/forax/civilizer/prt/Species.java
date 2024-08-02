@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public record Species(Class<?> raw, /*@Nullable*/ Object parameters) {
   public Species {
-    Objects.requireIdentity(raw);
+    //Objects.requireIdentity(raw);
   }
 
   @Override

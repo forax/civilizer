@@ -20,7 +20,7 @@ public interface Demo {
   static void main(String[] args) {
     var age = new Age(32);
     System.out.println(age);
-    System.out.println(age.getClass().isValue());
+    System.out.println(RT.isValue(age.getClass()));
     System.out.println(RT.isZeroDefault(age.getClass()));
     System.out.println(RT.defaultValue(age.getClass()));
 
