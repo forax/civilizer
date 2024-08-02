@@ -11,7 +11,7 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/*public class InheritanceTest {
+public class InheritanceTest {
   @Parametric("P0")
   static class Holder<T> {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
@@ -258,4 +258,4 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
     Test.test();
   }
-}*/
+}
