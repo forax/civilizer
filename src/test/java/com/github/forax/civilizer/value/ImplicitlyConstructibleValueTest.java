@@ -4,11 +4,10 @@ import com.github.forax.civilizer.vrt.NonNull;
 import com.github.forax.civilizer.vrt.Nullable;
 import com.github.forax.civilizer.vrt.RT;
 import com.github.forax.civilizer.vrt.Value;
-import com.github.forax.civilizer.vrt.ZeroDefault;
+import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
-import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,10 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ZeroDefaultValueTest {
-  @ZeroDefault @Value static class Dummy { }
+public class ImplicitlyConstructibleValueTest {
+  @ImplicitlyConstructible @Value static class Dummy { }
 
-  @ZeroDefault @Value static class Foo {
+  @ImplicitlyConstructible @Value static class Foo {
     private final int value;
 
     public Foo(int value) {
@@ -47,7 +46,7 @@ public class ZeroDefaultValueTest {
   public void zeroDefaultDummyValueClass() {
     assertAll(
         () -> assertTrue(Dummy.class.isValue()),
-        () -> assertTrue(RT.isZeroDefault(Dummy.class))
+        () -> assertTrue(RT.isImplicitlyConstructible(Dummy.class))
     );
   }
 
@@ -55,7 +54,7 @@ public class ZeroDefaultValueTest {
   public void zeroDefaultFooValueClass() {
     assertAll(
         () -> assertTrue(Foo.class.isValue()),
-        () -> assertTrue(RT.isZeroDefault(Foo.class))
+        () -> assertTrue(RT.isImplicitlyConstructible(Foo.class))
     );
   }
 

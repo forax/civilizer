@@ -10,19 +10,19 @@ and another (`ParametricRewriter`) transforms generics to support parametric gen
 ```java
   @Value record Person(@NonNull String name, @Nullable Address address, @NonNull Age age) {}
   @Value record Address(@NonNull String address) {}
-  @Value @ZeroDefault record Age(int age) {}
+  @Value @ImplicitlyConstructible record Age(int age) {}
 ```
 
 The prototype defines 4 annotations,
 - at declaration site, @Value declares a type with no identity (a value type),
-- at declaration site, @ZeroDefault declares that the default value of the value type has all its fields fill with zeroes,
+- at declaration site, @ImplicitlyConstructible declares that the default value of the value type has all its fields fill with zeroes,
 - at use site, @NonNull declares that null is not a possible value,
 - at use site, @Nullable declares that null is a possible value (this is also the default if there is no annotation).
 
 On stack, value types are scalarized, on heap, non-null zero-default value type are flattened, i.e. stored without a pointer.
 
-For example, the field age declared below is stored as an int on heap because the value type `Age` is declared as @ZeroDefault and
-the field `age` is declared @NonNull. 
+For example, the field age declared below is stored as an int on heap because the value type `Age` is declared
+as @ImplicitlyConstructible and the field `age` is declared @NonNull. 
 ```java
   class AgeContainer {
     @NonNull Age age;

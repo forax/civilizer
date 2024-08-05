@@ -21,11 +21,11 @@ public class RTTest {
   }
 
   @Test
-  public void isZeroDefault() {
+  public void isImplicitlyConstructible() {
     assertAll(
-        () -> assertFalse(RT.isZeroDefault(int.class)),
-        () -> assertFalse(RT.isZeroDefault(String.class)),
-        () -> assertTrue(RT.isZeroDefault(Complex.class))
+        () -> assertFalse(RT.isImplicitlyConstructible(int.class)),
+        () -> assertFalse(RT.isImplicitlyConstructible(String.class)),
+        () -> assertTrue(RT.isImplicitlyConstructible(Complex.class))
     );
   }
 
@@ -39,14 +39,14 @@ public class RTTest {
   }
 
   @Test
-  public void newNonNullArray() {
-    var array = RT.newNonNullArray(Complex.class, 3);
+  public void newFltattableArray() {
+    var array = RT.newNullRestrictedArray(Complex.class, 3);
     assertThrows(NullPointerException.class, () -> array[1] = null);
   }
 
   @Test
   public void isNullRestrictedArray() {
-    var array = RT.newNonNullArray(Complex.class, 3);
+    var array = RT.newNullRestrictedArray(Complex.class, 3);
     assertTrue(RT.isNullRestrictedArray(array));
   }
 }

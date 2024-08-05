@@ -1,17 +1,10 @@
 package com.github.forax.civilizer.vrt;
 
-import java.lang.annotation.Annotation;
-import java.lang.invoke.CallSite;
-import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodHandles.Lookup;
-import java.lang.invoke.MethodType;
-import java.lang.invoke.TypeDescriptor;
 import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.runtime.ObjectMethods;
+
+import static java.lang.invoke.MethodHandles.lookup;
+import static java.lang.invoke.MethodType.methodType;
 
 public final class RT {
   private RT() {
@@ -25,7 +18,7 @@ public final class RT {
     return type.isValue();
   }
 
-  private static final Method IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
+  private static final MethodHandle IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
       NEW_NULL_RESTRICTED_ARRAY, IS_NULL_RESTRICTED_ARRAY;
 
   static {
@@ -35,80 +28,71 @@ public final class RT {
     } catch (ClassNotFoundException e) {
       throw new AssertionError(e);
     }
+    var lookup = lookup();
     try {
-      IS_IMPLICITLY_CONSTRUCTIBLE = valueClass.getMethod("isImplicitlyConstructible", Class.class);
-      ZERO_INSTANCE = valueClass.getMethod("zeroInstance", Class.class);
-      NEW_NULL_RESTRICTED_ARRAY = valueClass.getMethod("newNullRestrictedArray", Class.class, int.class);
-      IS_NULL_RESTRICTED_ARRAY = valueClass.getMethod("isNullRestrictedArray", Object.class);
-    } catch (NoSuchMethodException e) {
+      IS_IMPLICITLY_CONSTRUCTIBLE = lookup.findStatic(valueClass, "isImplicitlyConstructible",
+          methodType(boolean.class, Class.class));
+      ZERO_INSTANCE = lookup.findStatic(valueClass, "zeroInstance",
+          methodType(Object.class, Class.class));
+      NEW_NULL_RESTRICTED_ARRAY = lookup.findStatic(valueClass,"newNullRestrictedArray",
+          methodType(Object[].class, Class.class, int.class));
+      IS_NULL_RESTRICTED_ARRAY = lookup.findStatic(valueClass, "isNullRestrictedArray",
+          methodType(boolean.class, Object.class));
+    } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
   }
 
-  public static boolean isZeroDefault(Class<?> type) {
+  public static boolean isImplicitlyConstructible(Class<?> type) {
     if (!isValue(type)) {
       return false;
     }
     try {
-      return (boolean) IS_IMPLICITLY_CONSTRUCTIBLE.invoke(null, type);
-    } catch (IllegalAccessException | InvocationTargetException e) {
+      return (boolean) IS_IMPLICITLY_CONSTRUCTIBLE.invokeExact(type);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T zeroInstance(Class<T> type) {
+    try {
+      return (T) ZERO_INSTANCE.invokeExact(type);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
       throw new AssertionError(e);
     }
   }
 
   @SuppressWarnings("unchecked")
   public static <T> T defaultValue(Class<T> type) {
-    if (!isZeroDefault(type)) {
-      return (T) Array.get(Array.newInstance(type, 1), 0);
+    if (isImplicitlyConstructible(type)) {
+      return zeroInstance(type);
     }
-    try {
-      return (T) ZERO_INSTANCE.invoke(null, type);
-    } catch (IllegalAccessException | InvocationTargetException e) {
-      throw new AssertionError(e);
-    }
+    return (T) Array.get(Array.newInstance(type, 1), 0);
   }
 
-
-
   @SuppressWarnings("unchecked")
-  public static <T> T[] newNonNullArray(Class<T> component, int length) {
+  public static <T> T[] newNullRestrictedArray(Class<T> component, int length) {
     try {
-      return (T[]) NEW_NULL_RESTRICTED_ARRAY.invoke(null, component, length);
-    } catch (IllegalAccessException | InvocationTargetException e) {
+      return (T[]) NEW_NULL_RESTRICTED_ARRAY.invokeExact(component, length);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
       throw new AssertionError(e);
     }
   }
 
   public static boolean isNullRestrictedArray(Object array) {
     try {
-      return (boolean) IS_NULL_RESTRICTED_ARRAY.invoke(null, array);
-    }  catch (IllegalAccessException | InvocationTargetException e) {
+      return (boolean) IS_NULL_RESTRICTED_ARRAY.invokeExact(array);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
       throw new AssertionError(e);
     }
   }
-
-  /*
-  public static boolean isZeroDefault(Class<?> type) {
-    if (!isValue(type)) {
-      return false;
-    }
-    return jdk.internal.value.ValueClass.isImplicitlyConstructible(type);
-  }
-
-  @SuppressWarnings("unchecked")
-  public static <T> T defaultValue(Class<T> type) {
-    if (!isZeroDefault(type)) {
-      return (T) Array.get(Array.newInstance(type, 1), 0);
-    }
-    return jdk.internal.value.ValueClass.zeroInstance(type);
-  }
-
-  @SuppressWarnings("unchecked")
-  public static <T> T[] newNonNullArray(Class<T> component, int length) {
-    return (T[]) jdk.internal.value.ValueClass.newNullRestrictedArray(component, length);
-  }
-
-  public static boolean isNullRestrictedArray(Object array) {
-    return jdk.internal.value.ValueClass.isNullRestrictedArray(array);
-  }*/
 }

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/*public class ValueSpecializedTest {
+public class ValueSpecializedTest {
   @Parametric("P1")
   static class SimpleList<E> {
     private static final String $P0 = "list Ljava/lang/Object;";
@@ -98,7 +98,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     static <T> T defaultValue() {
       "PM1".intern();
       var argument = (Class<?>) RT.ldc();
-      return (T) Array.get(Array.newInstance(argument, 1), 0);
+      return (T) com.github.forax.civilizer.vrt.RT.defaultValue(argument);
     }
   }
 
@@ -133,4 +133,4 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     }
     TestWithComplex.test();
   }
-}*/
+}

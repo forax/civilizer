@@ -1,7 +1,7 @@
 package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.vrt.Value;
-import com.github.forax.civilizer.vrt.ZeroDefault;
+import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
 
 import java.util.Objects;
 
@@ -13,7 +13,8 @@ public @ZeroDefault @Value record Complex(double re, double im) {
 }
 */
 
-public @ZeroDefault @Value final class Complex {private final double re;
+public @ImplicitlyConstructible
+@Value final class Complex {private final double re;
   private final double im;
 
   public Complex(double re, double im) {

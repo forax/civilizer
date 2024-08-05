@@ -111,8 +111,8 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
          - inside an instance method, the kiddy pool class is stored as an instance field $kiddyPool
          - inside a parametric static method, the kiddy pool class is the last parameter
    - TypeRestricted (not final) fields are initialized to their default value in the constructor,
-     and putValue on a TypeRestricted field checks the value with MethodHandle.asType()
-   - TypeRestricted method starts with a prolog that to a call that checks the arguments, with MethodHandle.asType()
+     and putValue on a TypeRestricted field checks if the value is restricted
+   - TypeRestricted method starts with a prolog that to a call that checks the arguments are restricted
 
    All the creation of the kiddy pool classes, all the type checking of the TypeRestrictions are deferred at runtime,
    see RT.
@@ -155,6 +155,10 @@ public final class ParametricRewriter {
   private static final String RT_INTERNAL = RT.class.getName().replace('.', '/');
   private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
       "bsm_ldc",
+      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+      false);
+  private static final Handle BSM_NEW_FLATTABLE_ARRAY = new Handle(H_INVOKESTATIC, RT_INTERNAL,
+      "bsm_newFlattableArray",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
       false);
   private static final Handle BSM_STATIC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
@@ -789,6 +793,21 @@ public final class ParametricRewriter {
               }
               return;
             }
+            if (owner.equals(RT_INTERNAL) && name.equals("newFlattableArray") && descriptor.equals("(I)[Ljava/lang/Object;")) {
+              var constant = constantValue;
+              if (constant == null) {
+                throw new RewriterException("no constant info for newFlattableArray");
+              }
+              constantValue = null;
+              var desc = MethodTypeDesc.ofDescriptor(descriptor);
+              if (!(constant instanceof ConstantDynamic)) {
+                loadKiddyPool();
+                desc = desc.insertParameterTypes(desc.parameterCount(), CD_Object);
+              }
+              mv.visitInvokeDynamicInsn("newFlattableArray", desc.descriptorString(), BSM_NEW_FLATTABLE_ARRAY, constant);
+              return;
+            }
+
 
             var parametricOwner = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(ClassData::parametric).orElse(false);
             var parametricCall = (boolean) Optional.ofNullable(classDataMap.get(owner)).map(cd -> cd.methodParametricSet.contains(new Method(name, descriptor))).orElse(false);

@@ -2,7 +2,7 @@ package com.github.forax.civilizer.value;
 
 import com.github.forax.civilizer.vrt.RT;
 import com.github.forax.civilizer.vrt.Value;
-import com.github.forax.civilizer.vrt.ZeroDefault;
+import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -35,7 +35,8 @@ public class ArrayTest {
 
   @Test
   public void arrayOfZeroBasedClas() {
-    @ZeroDefault @Value class ZeroDefaultFoo {}
+    @ImplicitlyConstructible
+    @Value class ZeroDefaultFoo {}
 
     var array = new ZeroDefaultFoo[3];
     assertAll(
@@ -46,9 +47,10 @@ public class ArrayTest {
 
   @Test
   public void arrayOfNonNullZeroBasedClas() {
-    @ZeroDefault @Value class ZeroDefaultFoo {}
+    @ImplicitlyConstructible
+    @Value class ZeroDefaultFoo {}
 
-    var array = RT.newNonNullArray(ZeroDefaultFoo.class, 3);
+    var array = RT.newNullRestrictedArray(ZeroDefaultFoo.class, 3);
     assertAll(
         () -> assertEquals(new ZeroDefaultFoo(), array[0]),
         () -> assertThrows(NullPointerException.class, () -> array[1] = null)

@@ -2,9 +2,8 @@ package com.github.forax.civilizer;
 
 import com.github.forax.civilizer.vrt.NonNull;
 import com.github.forax.civilizer.vrt.Nullable;
-import com.github.forax.civilizer.vrt.RT;
 import com.github.forax.civilizer.vrt.Value;
-import com.github.forax.civilizer.vrt.ZeroDefault;
+import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ByteVector;
@@ -23,7 +22,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,22 +43,22 @@ import static org.objectweb.asm.Opcodes.V23;
 /**
  * This rewriter works in two passes over the classes
  * The first pass gathers
- *  - the class declaration annotations : @Value, @ZeroDefault
+ *  - the class declaration annotations : @Value, @ImplicitlyConstructible
  *  - the field annotations : @Nullable or @NonNull
  *  - the method parameter annotations : @Nullable or @NonNull
  *  - method parameter types, return type and field types of each class
  *
  *  The second pass
- *  - at class declaration, if not annotated with @Value or @ZeroDefault, set ACC_IDENTITY
+ *  - at class declaration, if not annotated with @Value or @ImplicitlyConstructible, set ACC_IDENTITY
  *    set the minor version to PREVIEW (0xFFFF0000)
- *    add annotation jdk.internal.vm.annotation.ImplicitlyConstructible if @ZeroDefault is set
+ *    add annotation jdk.internal.vm.annotation.ImplicitlyConstructible if @ImplicitlyConstructible is set
  *  - at field declaration,
- *    if the class is annotated with @Value or @ZeroDefault, add ACC_STRICT
+ *    if the class is annotated with @Value or @ImplicitlyConstructible, add ACC_STRICT
  *    (TODO: should verify that all fields are initialized before the call to super())
  *    add annotation jdk.internal.vm.annotation.NullRestricted if @NonNull is set
  *  - at method entry, add Objects.requireNonNull for all @NonNull parameters
  *  - add attribute LoadableDescriptors wih all method parameter types, return type and field types that are
- *    either annotated with @Value or @ZeroDefault
+ *    either annotated with @Value or @ImplicitlyConstructible
  */
 public final class ValueRewriter {
   private ValueRewriter() {
@@ -69,6 +67,14 @@ public final class ValueRewriter {
 
   private enum TypeKind {
     IDENTITY, VALUE, ZERO_DEFAULT;
+
+    boolean isIdentity() {
+      return this == IDENTITY;
+    }
+
+    boolean isZeroDefault() {
+      return this == ZERO_DEFAULT;
+    }
 
     TypeKind max(TypeKind kind) {
       return compareTo(kind) > 0 ? this: kind;
@@ -109,7 +115,7 @@ public final class ValueRewriter {
   private static final String NULLABLE_DESCRIPTOR = Nullable.class.descriptorString();
 
   private static final String VALUE_DESCRIPTOR = Value.class.descriptorString();
-  private static final String ZERO_DEFAULT_DESCRIPTOR = ZeroDefault.class.descriptorString();
+  private static final String ZERO_DEFAULT_DESCRIPTOR = ImplicitlyConstructible.class.descriptorString();
 
   private static final String IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR = "Ljdk/internal/vm/annotation/ImplicitlyConstructible;";
   private static final String NULL_RESTRICTED_DESCRIPTOR = "Ljdk/internal/vm/annotation/NullRestricted;";
@@ -319,20 +325,14 @@ public final class ValueRewriter {
           @Override
           public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             var kind = classData.typeKind;
-            var classVersion = switch (kind) {
-              case IDENTITY -> version;
-              case VALUE, ZERO_DEFAULT -> V23 | Opcodes.V_PREVIEW;
-            };
-            var classAccess = switch (kind) {
-              case IDENTITY -> access | ACC_IDENTITY;
-              case VALUE, ZERO_DEFAULT -> (access | ACC_FINAL) & (~ACC_IDENTITY);
-            };
+            var classVersion = kind.isIdentity() ? version : (V23 | Opcodes.V_PREVIEW);
+            var classAccess = kind.isIdentity() ? (access | ACC_IDENTITY) : ((access | ACC_FINAL) & (~ACC_IDENTITY));
             if (classVersion != version || classAccess != access) {
               System.out.println("  rewrite class " + name + " " + kind + " " + version + " " + classAccess);
             }
             super.visit(classVersion, classAccess, name, signature, superName, interfaces);
 
-            if (kind == TypeKind.ZERO_DEFAULT) {
+            if (kind.isZeroDefault()) {
               var av = super.visitAnnotation(IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR, true);
               av.visitEnd();
             }
@@ -341,10 +341,10 @@ public final class ValueRewriter {
           @Override
           public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
             var kind = classData.typeKind;
-            var fieldAccess = (access & ACC_STATIC) != 0 ? access : switch (kind) {
-              case IDENTITY -> access;
-              case VALUE, ZERO_DEFAULT -> access | ACC_FINAL | ACC_STRICT;  // FIXME should be verified
-            };
+            var fieldAccess = (access & ACC_STATIC) != 0 || kind.isIdentity() ?
+                access :
+                access | ACC_FINAL | ACC_STRICT; // FIXME should be verified
+
             var fv = super.visitField(fieldAccess, fieldName, fieldDescriptor, signature, value);
             var type = Type.getType(fieldDescriptor);
             var typeSort = type.getSort();
@@ -360,12 +360,13 @@ public final class ValueRewriter {
             return fv;
           }
 
+          private static final Set<String> ALLOWED_SUPER_NAMES = Set.of("java/lang/Object", "java/lang/Number", "java/lang/Record");
+
           @Override
           public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
             var mv = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
             var kind = classData.typeKind;
-            if (switch (kind) { case IDENTITY -> false; case VALUE, ZERO_DEFAULT -> true;} &&
-                (classData.superName.equals("java/lang/Object") || classData.superName.equals("java/lang/Record"))) {
+            if (!kind.isIdentity() && ALLOWED_SUPER_NAMES.contains(classData.superName)) {
               mv = moveSuperCallToTheEnd(mv, classData.superName);
             }
             var methodData = methodDataMap.get(methodName + methodDescriptor);
@@ -380,10 +381,9 @@ public final class ValueRewriter {
           @Override
           public void visitInnerClass(String name, String outerName, String innerName, int access) {
             var typeKind = Optional.ofNullable(classDataMap.get(name)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
-            var innerAccess = switch (typeKind) {
-              case IDENTITY -> access /*| ACC_IDENTITY*/;
-              case VALUE, ZERO_DEFAULT -> (access | ACC_FINAL) & (~ ACC_IDENTITY);
-            };
+            var innerAccess = typeKind.isIdentity() ?
+                access /*| ACC_IDENTITY*/ :
+                (access | ACC_FINAL) & (~ ACC_IDENTITY);
             super.visitInnerClass(name, outerName, innerName, innerAccess);
           }
 

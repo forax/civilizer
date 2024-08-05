@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/*public class TypeRestrictionTest {
+public class TypeRestrictionTest {
   @Parametric("P1")
   static class Holder<T> {
     private static final String $P0 = "list Ljava/lang/Object;";
@@ -79,4 +79,4 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     }
     Test.initDefault();
   }
-}*/
+}

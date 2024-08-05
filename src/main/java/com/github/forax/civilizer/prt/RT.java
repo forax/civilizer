@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.IntStream;
 
 import static java.lang.invoke.MethodHandles.constant;
@@ -31,7 +32,9 @@ import static java.lang.invoke.MethodHandles.filterArguments;
 import static java.lang.invoke.MethodHandles.foldArguments;
 import static java.lang.invoke.MethodHandles.guardWithTest;
 import static java.lang.invoke.MethodHandles.insertArguments;
+import static java.lang.invoke.MethodHandles.lookup;
 import static java.lang.invoke.MethodHandles.permuteArguments;
+import static java.lang.invoke.MethodHandles.publicLookup;
 import static java.lang.invoke.MethodType.methodType;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -45,6 +48,10 @@ public final class RT {
   }
 
   public static Object ldc() {
+    throw new LinkageError("method calls to this method should be rewritten by the rewriter");
+  }
+
+  public static <T> T[] newFlattableArray(int length) {
     throw new LinkageError("method calls to this method should be rewritten by the rewriter");
   }
 
@@ -357,6 +364,39 @@ public final class RT {
     return new ConstantCallSite(constant(Object.class, constant));
   }
 
+  private static final MethodHandle NEW_NULL_RESTRICTED_ARRAY_MH;
+  static {
+    var lookup = lookup();
+    try {
+      NEW_NULL_RESTRICTED_ARRAY_MH = lookup.findStatic(com.github.forax.civilizer.vrt.RT.class, "newNullRestrictedArray",
+          methodType(Object[].class, Class.class, int.class));
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
+  public static CallSite bsm_newFlattableArray(Lookup lookup, String name, MethodType type, Object constant) {
+    //System.out.println("bsm_newFlattableArray " + constant + " (instance of " + constant.getClass() + ")");
+    if (constant instanceof String kiddyPoolRef) {
+      return new KiddyPoolRefInliningCache(type, lookup, kiddyPoolRef,
+          value -> bsm_newFlattableArray(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
+    }
+    if (constant instanceof Linkage linkage) {
+      var typeArguments = (List<?>) linkage.parameters();
+      var typeArgument = (Class<?>) typeArguments.getFirst();
+      MethodHandle target;
+      if (com.github.forax.civilizer.vrt.RT.isImplicitlyConstructible(typeArgument)) {
+        target = insertArguments(NEW_NULL_RESTRICTED_ARRAY_MH, 0, typeArgument);
+      } else {
+        target = MethodHandles.arrayConstructor(typeArgument.arrayType());
+      }
+      return new ConstantCallSite(target);
+    }
+    throw new LinkageError("bsm_newFlattableArray " + constant + " (instance of " + constant.getClass() + ")");
+  }
+
+
   @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
   public static CallSite bsm_static(Lookup lookup, String name, MethodType type, Class<?> owner, Object constant) throws NoSuchMethodException, IllegalAccessException {
     //System.out.println("bsm_static " + name + type + " " + constant);
@@ -473,7 +513,8 @@ public final class RT {
       if (restrictionTypes.size() != 1) {
         throw new LinkageError(restriction + " has too many types, only one is required");
       }
-      var defaultValue = Array.get(Array.newInstance(restrictionTypes.get(0), 1), 0);
+      var restrictionType = restrictionTypes.getFirst();
+      var defaultValue = com.github.forax.civilizer.vrt.RT.defaultValue(restrictionType);
       return new ConstantCallSite(constant(type.returnType(), defaultValue));
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -481,7 +522,17 @@ public final class RT {
           value -> bsm_init_default(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
-    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+    throw new LinkageError("bsm_init_default " + type + " " + constant);
+  }
+
+  private static final MethodHandle REQUIRE_NON_NULL_MH;
+  static {
+    var lookup = publicLookup();
+    try {
+      REQUIRE_NON_NULL_MH = lookup.findStatic(Objects.class, "requireNonNull", methodType(Object.class, Object.class));
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new AssertionError(e);
+    }
   }
 
   @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
@@ -493,8 +544,16 @@ public final class RT {
       if (restrictionTypes.size() != 1) {
         throw new LinkageError(restriction + " has too many types, only one is required");
       }
+      var restrictionType = restrictionTypes.getFirst();
       var setter = lookup.findSetter(type.parameterType(0), name, type.parameterType(1));
-      var target = setter.asType(methodType(type.returnType(), type.parameterType(0), restrictionTypes.get(0))).asType(type);
+      if (com.github.forax.civilizer.vrt.RT.isImplicitlyConstructible(restrictionType)) {
+        var filter = REQUIRE_NON_NULL_MH
+            .asType(methodType(type.parameterType(1), restrictionType));
+        setter = filterArguments(setter, 1, filter);
+      }
+      var target = setter
+          .asType(methodType(type.returnType(), type.parameterType(0), restrictionType))
+          .asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -502,7 +561,7 @@ public final class RT {
           value -> bsm_put_value(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
-    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+    throw new LinkageError("bsm_put_value_check " + type + " " + constant);
   }
 
   @SuppressWarnings({"unused", "WeakerAccess"})  // used by reflection
@@ -515,7 +574,20 @@ public final class RT {
         throw new LinkageError(restriction + " types count != parameter count");
       }
       var empty = MethodHandles.empty(type);
-      var target = empty.asType(methodType(type.returnType(), restriction.types())).asType(type);
+      var filters = new MethodHandle[restrictionTypes.size()];
+      Arrays.setAll(filters,
+          i -> {
+            var restrictionType = restrictionTypes.get(i);
+            if (!com.github.forax.civilizer.vrt.RT.isImplicitlyConstructible(restrictionType)) {
+              return null;
+            }
+            return REQUIRE_NON_NULL_MH
+                .asType(methodType(type.parameterType(i), restrictionType));
+          });
+      var filtered = filterArguments(empty, 0, filters);
+      var target = filtered
+          .asType(methodType(type.returnType(), restrictionTypes))
+          .asType(type);
       return new ConstantCallSite(target);
     }
     if (constant instanceof String kiddyPoolRef) {
@@ -523,7 +595,7 @@ public final class RT {
           value -> bsm_method_restriction(lookup, name, type.dropParameterTypes(type.parameterCount() - 1, type.parameterCount()), value));
     }
 
-    throw new LinkageError(lookup + " " + name + " " + type+ " " + constant);
+    throw new LinkageError("bsm_method_restriction " + type + " " + constant);
   }
 
   @SuppressWarnings("unused") // used by reflection
@@ -536,7 +608,7 @@ public final class RT {
   @SuppressWarnings("unused") // used by reflection
   public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) {
     //System.out.println("bsm_qtype " + primaryType.getName());
-    if (!com.github.forax.civilizer.vrt.RT.isZeroDefault(primaryType)) {
+    if (!com.github.forax.civilizer.vrt.RT.isImplicitlyConstructible(primaryType)) {
       throw new IllegalArgumentException("primary type is not a zero default value " + primaryType.getName());
     }
     return primaryType;
