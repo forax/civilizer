@@ -99,6 +99,8 @@ public final class RT {
 
   @SuppressWarnings("unchecked")
   public static <T> T requireIdentity(Object object, String message) {
+    Objects.requireNonNull(object, "object is null");
+    Objects.requireNonNull(message, "message is null");
     try {
       return (T) REQUIRE_IDENTTY.invokeExact(object, message);
     } catch (RuntimeException | Error e) {
