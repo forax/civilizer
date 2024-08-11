@@ -7,7 +7,7 @@ public class Demo {
   @Parametric("P1")
   static class Foo<T> {
     private static final String $P0 = "list Ljava/lang/Object;";
-    private static final String $P1 = "mh Lcom/github/forax/civilizer/vm/RT; 'erase (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
+    private static final String $P1 = "mh Lcom/github/forax/civilizer/prt/JDK; 'erase (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; P0;";
     private static final String $PA0 = "anchor P1;";
     private static final String $PA1 = "list.get PA0; 0";
     private static final String $PA2 = "restriction PA1;";
@@ -30,7 +30,7 @@ public class Demo {
   private static final String $P3 = "linkage P2;";
 
 
-  // $JAVA_HOME/bin/java -XX:+EnablePrimitiveClasses -cp target/classes:/Users/forax/.m2/repository/org/ow2/asm/asm/9.4/asm-9.4.jar com/github/forax/civilizer/species/Demo
+  // $JAVA_HOME/bin/java --enable-preview -cp target/classes:/Users/forax/.m2/repository/org/ow2/asm/asm/9.7/asm-9.7.jar --add-exports=java.base/jdk.internal.value=ALL-UNNAMED com/github/forax/civilizer/parametric/Demo
   public static void main(String[] args) {
     "P3".intern();
     var foo = new Foo<String>("foo");
