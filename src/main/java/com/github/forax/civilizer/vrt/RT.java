@@ -2,6 +2,7 @@ package com.github.forax.civilizer.vrt;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Array;
+import java.util.Objects;
 
 import static java.lang.invoke.MethodHandles.lookup;
 import static java.lang.invoke.MethodType.methodType;
@@ -19,7 +20,7 @@ public final class RT {
   }
 
   private static final MethodHandle IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
-      NEW_NULL_RESTRICTED_ARRAY, IS_NULL_RESTRICTED_ARRAY;
+      NEW_NULL_RESTRICTED_ARRAY, IS_NULL_RESTRICTED_ARRAY, REQUIRE_IDENTTY;
 
   static {
     Class<?> valueClass;
@@ -38,6 +39,8 @@ public final class RT {
           methodType(Object[].class, Class.class, int.class));
       IS_NULL_RESTRICTED_ARRAY = lookup.findStatic(valueClass, "isNullRestrictedArray",
           methodType(boolean.class, Object.class));
+      REQUIRE_IDENTTY = lookup.findStatic(Objects.class, "requireIdentity",
+          methodType(Object.class, Object.class, String.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new AssertionError(e);
     }
@@ -89,6 +92,17 @@ public final class RT {
   public static boolean isNullRestrictedArray(Object array) {
     try {
       return (boolean) IS_NULL_RESTRICTED_ARRAY.invokeExact(array);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T requireIdentity(Object object, String message) {
+    try {
+      return (T) REQUIRE_IDENTTY.invokeExact(object, message);
     } catch (RuntimeException | Error e) {
       throw e;
     } catch (Throwable e) {
