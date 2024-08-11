@@ -12,8 +12,6 @@ public final class RT {
     throw new AssertionError();
   }
 
-  private static final int ACC_IDENTITY = 0x0020;
-
   public static boolean isValue(Class<?> type) {
     //return (type.getModifiers() & ACC_IDENTITY) == 0;
     return type.isValue();
