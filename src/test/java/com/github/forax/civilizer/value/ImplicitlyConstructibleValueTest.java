@@ -45,7 +45,7 @@ public class ImplicitlyConstructibleValueTest {
   @Test
   public void zeroDefaultDummyValueClass() {
     assertAll(
-        () -> assertTrue(Dummy.class.isValue()),
+        () -> assertTrue(RT.isValue(Dummy.class)),
         () -> assertTrue(RT.isImplicitlyConstructible(Dummy.class))
     );
   }
@@ -53,7 +53,7 @@ public class ImplicitlyConstructibleValueTest {
   @Test
   public void zeroDefaultFooValueClass() {
     assertAll(
-        () -> assertTrue(Foo.class.isValue()),
+        () -> assertTrue(RT.isValue(Foo.class)),
         () -> assertTrue(RT.isImplicitlyConstructible(Foo.class))
     );
   }

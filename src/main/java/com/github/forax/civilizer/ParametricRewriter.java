@@ -218,10 +218,6 @@ public final class ParametricRewriter {
       "bsm_type",
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
-  private static final Handle BSM_QTYPE = new Handle(H_INVOKESTATIC, RT_INTERNAL,
-      "bsm_qtype",
-      "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/Class;)Ljava/lang/Object;",
-      false);
 
   private static Optional<ClassData> analyze(byte[] buffer) {
     record ProtoCondy(String condyName, String action, List<String> args) {}
@@ -356,7 +352,6 @@ public final class ParametricRewriter {
       private Object condyArgument(String arg) {
         return switch (arg.charAt(0)) {
           case 'V', 'Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D' -> new ConstantDynamic(arg, "Ljava/lang/Object;", BSM_TYPE);
-          case 'Q' -> new ConstantDynamic("_", "Ljava/lang/Object;", BSM_QTYPE, Type.getType("L" + arg.substring(1)));
           case 'L' -> Type.getType(arg);
           case 'P' -> {
             var condyInfo = condyMap.get(arg.substring(0, arg.length() - 1));
@@ -458,7 +453,7 @@ public final class ParametricRewriter {
         return new RootInfo(RootInfo.RootKind.ANCHOR, protoCondy.condyName, parentName);
       }
 
-      private static RootInfo findRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap, LinkedHashMap<ProtoCondy, RootInfo> rootMap) {
+      private static RootInfo findRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap, Map<ProtoCondy, RootInfo> rootMap) {
         var cachedRoot = rootMap.get(protoCondy);
         if (cachedRoot != null) {
           return cachedRoot;
@@ -493,7 +488,7 @@ public final class ParametricRewriter {
         return root;
       }
 
-      private static void dumpDependencyAnalysis(LinkedHashMap<ProtoCondy, RootInfo> rootMap) {
+      private static void dumpDependencyAnalysis(Map<ProtoCondy, RootInfo> rootMap) {
         var dependencyMap = rootMap.entrySet().stream()
             .filter(rootEntry -> rootEntry.getValue().kind == RootInfo.RootKind.ANCHOR)
             .collect(groupingBy(Entry::getValue, mapping(Entry::getKey, toList())));

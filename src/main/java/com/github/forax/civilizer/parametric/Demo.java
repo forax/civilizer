@@ -3,6 +3,7 @@ package com.github.forax.civilizer.parametric;
 import com.github.forax.civilizer.prt.Parametric;
 import com.github.forax.civilizer.prt.TypeRestriction;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class Demo {
   @Parametric("P1")
   static class Foo<T> {

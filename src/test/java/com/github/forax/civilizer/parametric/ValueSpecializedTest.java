@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class ValueSpecializedTest {
   @Parametric("P1")
   static class SimpleList<E> {
@@ -53,7 +54,7 @@ public class ValueSpecializedTest {
     }
   }
 
-  private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
+  private static final String $P0 = "list Lcom/github/forax/civilizer/value/Complex;";
   private static final String $P1 = "linkage P0;";
 
   @Test
@@ -94,7 +95,7 @@ public class ValueSpecializedTest {
     private static final String $PM1 = "list.get PM0; 0";
 
     @Parametric("P0")
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
     static <T> T defaultValue() {
       "PM1".intern();
       var argument = (Class<?>) RT.ldc();
@@ -121,7 +122,7 @@ public class ValueSpecializedTest {
   @Test
   public void specializedComplexDefaultValue() {
     class TestWithComplex {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
+      private static final String $P0 = "list Lcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       static void test() {

@@ -11,6 +11,7 @@ import java.util.Objects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class SimpleListTest {
   @Parametric("P1")
   static class SimpleList<E> {
@@ -137,7 +138,7 @@ public class SimpleListTest {
     assertEquals("baz", element);
   }
 
-  private static final String $P_complex_0 = "list Qcom/github/forax/civilizer/value/Complex;";
+  private static final String $P_complex_0 = "list Lcom/github/forax/civilizer/value/Complex;";
   private static final String $P_complex_1 = "linkage P_complex_0;";
 
   @Test

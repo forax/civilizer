@@ -17,7 +17,6 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodHandles.Lookup.ClassOption;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,10 +46,12 @@ public final class RT {
     throw new AssertionError();
   }
 
+  @SuppressWarnings("DoNotCallSuggester")  // rewritten by the bytecode rewriter
   public static Object ldc() {
     throw new LinkageError("method calls to this method should be rewritten by the rewriter");
   }
 
+  @SuppressWarnings("DoNotCallSuggester")  // rewritten by the bytecode rewriter
   public static <T> T[] newFlattableArray(int length) {
     throw new LinkageError("method calls to this method should be rewritten by the rewriter");
   }
@@ -248,10 +249,12 @@ public final class RT {
       setTarget(foldArguments(exactInvoker(type), combiner));
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private static boolean pointerCheck(Object o, Object o2) {
       return o == o2;
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private MethodHandle slowPath(Object kiddyPool) throws Throwable {
       var accessor = lookup.findStatic((Class<?>) kiddyPool, "$" + kiddyPoolRef, methodType(Object.class));
       var value = accessor.invokeExact();
@@ -291,10 +294,12 @@ public final class RT {
       setTarget(foldArguments(exactInvoker(type), combiner));
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private static boolean pointerCheck(Object o, Object o2) {
       return o == o2;
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private MethodHandle slowPath(Object kiddyPool) {
       var kiddyPoolClass = (Class<?>) kiddyPool;
       var superKiddyPool = superKiddyPool(lookup, kiddyPoolClass, superRaw);
@@ -311,7 +316,7 @@ public final class RT {
 
   private static final class VirtualCallInliningCache extends MutableCallSite {
     @FunctionalInterface
-    private interface BSM {
+    private interface VirtualCallBSM {
       CallSite apply(Class<?> receiverClass) throws Throwable;
     }
 
@@ -327,10 +332,10 @@ public final class RT {
     }
 
     private final Lookup lookup;
-    private final BSM bsm;
+    private final VirtualCallBSM bsm;
 
     @SuppressWarnings("ThisEscapedInObjectConstruction")
-    private VirtualCallInliningCache(MethodType type, Lookup lookup, BSM bsm) {
+    private VirtualCallInliningCache(MethodType type, Lookup lookup, VirtualCallBSM bsm) {
       super(type);
       this.lookup = lookup;
       this.bsm = bsm;
@@ -338,10 +343,12 @@ public final class RT {
       setTarget(foldArguments(exactInvoker(type), combiner.asType(methodType(MethodHandle.class, type.parameterType(0)))));
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private static boolean classCheck(Class<?> clazz, Object o) {
       return o.getClass() == clazz;
     }
 
+    @SuppressWarnings("unused")  // used by reflection
     private MethodHandle slowPath(Object receiver) throws Throwable {
       var receiverClass = receiver.getClass();
       var target = bsm.apply(receiverClass).dynamicInvoker();
@@ -603,15 +610,6 @@ public final class RT {
     //System.out.println("bsm_type " + name);
     // primitiveClass() is not called directly to avoid to have java/lang/Class in the descriptors
     return ConstantBootstraps.primitiveClass(lookup, name, Class.class);
-  }
-
-  @SuppressWarnings("unused") // used by reflection
-  public static Object bsm_qtype(Lookup lookup, String name, Class<?> type, Class<?> primaryType) {
-    //System.out.println("bsm_qtype " + primaryType.getName());
-    if (!com.github.forax.civilizer.vrt.RT.isImplicitlyConstructible(primaryType)) {
-      throw new IllegalArgumentException("primary type is not a zero default value " + primaryType.getName());
-    }
-    return primaryType;
   }
 
   @SuppressWarnings("unused") // used by reflection

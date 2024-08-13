@@ -11,9 +11,10 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class InheritanceTest {
   @Parametric("P0")
-  static class Holder<T> {
+  final static class Holder<T> {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
 
@@ -42,7 +43,7 @@ public class InheritanceTest {
 
   @Test
   public void testHolder() {
-    class StringTest {
+    final class StringTest {
       private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
 
@@ -69,7 +70,8 @@ public class InheritanceTest {
   }
 
   @Parametric("P0")
-  static class Pair<T, U> {
+  @SuppressWarnings("UnusedTypeParameter")
+  final static class Pair<T, U> {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
 
@@ -100,7 +102,7 @@ public class InheritanceTest {
 
   @Test
   public void testPair() {
-    class PairTest {
+    final class PairTest {
       private static final String $P0 = "list Ljava/lang/String; Ljava/lang/Integer;";
       private static final String $P1 = "linkage P0;";
       private static final String $P2 = "list Ljava/lang/Double;";
@@ -173,7 +175,7 @@ public class InheritanceTest {
       private static final String $P3 = "super P2;";
     }
 
-    class Test {
+    class TestParametricArgument {
       private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
       private static final String $P2 = "list Ljava/lang/Integer;";
@@ -190,7 +192,7 @@ public class InheritanceTest {
       }
     }
 
-    Test.test();
+    TestParametricArgument.test();
   }
 
 
@@ -239,7 +241,7 @@ public class InheritanceTest {
 
   @Test
   public void testInheritance() {
-    record Test() {
+    record TestInheritance() {
       private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
       private static final String $P2 = "list Ljava/lang/Double;";
@@ -256,6 +258,6 @@ public class InheritanceTest {
       }
     }
 
-    Test.test();
+    TestInheritance.test();
   }
 }

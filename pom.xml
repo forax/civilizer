@@ -35,6 +35,17 @@
             <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_core</artifactId>
+            <version>2.30.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.uber.nullaway</groupId>
+            <artifactId>nullaway</artifactId>
+            <version>0.11.1</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -44,12 +55,41 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
+                    <fork>true</fork>
                     <source>23</source>
                     <target>23</target>
                     <!--compilerArgs>
                         <arg>- -add-exports=java.base/jdk.internal.vm.annotation=ALL-UNNAMED</arg>
                         <arg>- -add-exports=java.base/jdk.internal.value=ALL-UNNAMED</arg>
                     </compilerArgs-->
+                    <compilerArgs>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <!-- arg>-Xep:NullAway:ERROR</arg -->
+                        <arg>-Xplugin:ErrorProne -XepOpt:NullAway:AnnotatedPackages=com.uber -Xep:RethrowReflectiveOperationExceptionAsLinkageError:OFF</arg>
+
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>2.30.0</version>
+                        </path>
+                        <path>
+                            <groupId>com.uber.nullaway</groupId>
+                            <artifactId>nullaway</artifactId>
+                            <version>0.11.1</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 

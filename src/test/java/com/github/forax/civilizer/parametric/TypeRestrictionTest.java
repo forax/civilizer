@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class TypeRestrictionTest {
   @Parametric("P1")
   static class Holder<T> {
@@ -32,7 +33,7 @@ public class TypeRestrictionTest {
 
   @Test
   public void initIdentityDefault() {
-    class Test {
+    final class TestIdentityDefault {
       private static final String $P0 = "list Ljava/lang/String;";
       private static final String $P1 = "linkage P0;";
 
@@ -44,13 +45,13 @@ public class TypeRestrictionTest {
         assertNull(element);
       }
     }
-    Test.initDefault();
+    TestIdentityDefault.initDefault();
   }
 
   @Test
   public void initZeroDefaultValue() {
-    class Test {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
+    class TestZeroDefault {
+      private static final String $P0 = "list Lcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
@@ -61,13 +62,13 @@ public class TypeRestrictionTest {
         assertEquals(Complex.of(0.0, 0.0), element);
       }
     }
-    Test.initDefault();
+    TestZeroDefault.initDefault();
   }
 
   @Test
   public void putFieldZeroDefaultValue() {
-    class Test {
-      private static final String $P0 = "list Qcom/github/forax/civilizer/value/Complex;";
+    class TestZeroDefault {
+      private static final String $P0 = "list Lcom/github/forax/civilizer/value/Complex;";
       private static final String $P1 = "linkage P0;";
 
       public static void initDefault() {
@@ -77,6 +78,6 @@ public class TypeRestrictionTest {
         assertThrows(NullPointerException.class, () -> holder.set(null));
       }
     }
-    Test.initDefault();
+    TestZeroDefault.initDefault();
   }
 }

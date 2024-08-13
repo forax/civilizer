@@ -9,9 +9,8 @@ import java.util.Arrays;
 import java.util.Objects;import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class FibTest {
-  private record SpecializationKey(Location.Key key, int parameters) {}
-
   private static final ConcurrentHashMap<Integer, Object> SPECIALIZATION_CACHE = new ConcurrentHashMap<>();
 
   public static Object bsm(Location location, Integer value) {

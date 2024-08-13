@@ -273,7 +273,7 @@ public final class ValueRewriter {
     };
   }
 
-  private static ClassVisitor dependencyCollectorAdapter(HashSet<String> descriptors, ClassVisitor cv) {
+  private static ClassVisitor dependencyCollectorAdapter(Set<String> descriptors, ClassVisitor cv) {
     return new ClassVisitor(ASM9, cv) {
       @Override
       public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
@@ -326,7 +326,7 @@ public final class ValueRewriter {
           public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             var kind = classData.typeKind;
             var classVersion = kind.isIdentity() ? version : (V23 | Opcodes.V_PREVIEW);
-            var classAccess = kind.isIdentity() ? (access | ACC_IDENTITY) : ((access | ACC_FINAL) & (~ACC_IDENTITY));
+            var classAccess = kind.isIdentity() ? (access | ACC_IDENTITY) : (access | ACC_FINAL) & ~ACC_IDENTITY;
             if (classVersion != version || classAccess != access) {
               System.out.println("  rewrite class " + name + " " + kind + " " + version + " " + classAccess);
             }
@@ -373,7 +373,7 @@ public final class ValueRewriter {
             Map<Integer, NullKind> parameterMap;
             if (methodData != null && !(parameterMap = methodData.parameterMap).isEmpty()) {
               System.out.println("  rewrite method " + methodName + "." + methodDescriptor + " " + parameterMap);
-              mv = preconditionsAdapter(methodDescriptor, classDataMap, parameterMap, mv);
+              mv = preconditionsAdapter(methodDescriptor, parameterMap, mv);
             }
             return mv;
           }
@@ -383,7 +383,7 @@ public final class ValueRewriter {
             var typeKind = Optional.ofNullable(classDataMap.get(name)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
             var innerAccess = typeKind.isIdentity() ?
                 access /*| ACC_IDENTITY*/ :
-                (access | ACC_FINAL) & (~ ACC_IDENTITY);
+                (access | ACC_FINAL) & ~ ACC_IDENTITY;
             super.visitInnerClass(name, outerName, innerName, innerAccess);
           }
 
@@ -426,7 +426,7 @@ public final class ValueRewriter {
     };
   }
 
-  private static MethodVisitor preconditionsAdapter(String methodDescriptor, Map<String,ClassData> classDataMap, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
+  private static MethodVisitor preconditionsAdapter(String methodDescriptor, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
     return new MethodVisitor(ASM9,  mv) {
       private int maxLocals = -1;
 
@@ -440,7 +440,7 @@ public final class ValueRewriter {
           if (typeSort == Type.OBJECT /*|| typeSort == Type.ARRAY FIXME*/) {
             var parameterNullKind = parameterMap.getOrDefault(i, NullKind.NULLABLE);
             if (parameterNullKind == NullKind.NONNULL) {
-              var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
+              //var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
               mv.visitVarInsn(ALOAD, slot);
               mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
               mv.visitInsn(POP);

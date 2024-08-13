@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class NullRestrictedArrayTest {
   @Parametric("P1")
   static class ArrayCreation<E> {
@@ -38,7 +38,7 @@ public class NullRestrictedArrayTest {
     assertSame(Object[].class, array.getClass());
   }
 
-  private static final String $P_complex_0 = "list Qcom/github/forax/civilizer/value/Complex;";
+  private static final String $P_complex_0 = "list Lcom/github/forax/civilizer/value/Complex;";
   private static final String $P_complex_1 = "linkage P_complex_0;";
 
   @Test

@@ -12,12 +12,7 @@ public final class RT {
     throw new AssertionError();
   }
 
-  public static boolean isValue(Class<?> type) {
-    //return (type.getModifiers() & ACC_IDENTITY) == 0;
-    return type.isValue();
-  }
-
-  private static final MethodHandle IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
+  private static final MethodHandle IS_VALUE, IS_IMPLICITLY_CONSTRUCTIBLE, ZERO_INSTANCE,
       NEW_NULL_RESTRICTED_ARRAY, IS_NULL_RESTRICTED_ARRAY, REQUIRE_IDENTTY;
 
   static {
@@ -29,6 +24,7 @@ public final class RT {
     }
     var lookup = lookup();
     try {
+      IS_VALUE = lookup.findVirtual(Class.class, "isValue", methodType(boolean.class));
       IS_IMPLICITLY_CONSTRUCTIBLE = lookup.findStatic(valueClass, "isImplicitlyConstructible",
           methodType(boolean.class, Class.class));
       ZERO_INSTANCE = lookup.findStatic(valueClass, "zeroInstance",
@@ -40,6 +36,18 @@ public final class RT {
       REQUIRE_IDENTTY = lookup.findStatic(Objects.class, "requireIdentity",
           methodType(Object.class, Object.class, String.class));
     } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  public static boolean isValue(Class<?> type) {
+    //return (type.getModifiers() & ACC_IDENTITY) == 0;
+    //return type.isValue();
+    try {
+      return (boolean) IS_VALUE.invokeExact(type);
+    } catch (RuntimeException | Error e) {
+      throw e;
+    } catch (Throwable e) {
       throw new AssertionError(e);
     }
   }
@@ -98,7 +106,7 @@ public final class RT {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T requireIdentity(Object object, String message) {
+  public static <T> T requireIdentity(T object, String message) {
     Objects.requireNonNull(object, "object is null");
     Objects.requireNonNull(message, "message is null");
     try {

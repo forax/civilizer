@@ -15,59 +15,61 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings({"ReturnValueIgnored", "UnusedVariable"})
 public class CondyLispTest {
   @Test
   public void ldcInteger() {
-    class Foo {
-      private static final String $P0 = "42";
+    final class Foo {
+      private static final String $P0 = "list 42";
 
       static void test() {
         "P0".intern();
         var value = RT.ldc();
-        assertEquals(42, value);
+        assertEquals(42, ((List<?>) value).getFirst());
       }
     }
+    Foo.test();
   }
 
   @Test
   public void ldcDouble() {
-    class Foo {
-      private static final String $P0 = "4.0";
+    final class Foo {
+      private static final String $P0 = "list 4.0";
 
       static void test() {
         "P0".intern();
         var value = RT.ldc();
-        assertEquals(4.0, value);
+        assertEquals(4.0, ((List<?>) value).getFirst());
       }
     }
+    Foo.test();
   }
 
   @Test
   public void ldcString() {
-    class Foo {
-      private static final String $P0 = """
-          "foo"\
-          """;
+    final class Foo {
+      private static final String $P0 = "list 'foo";
 
       static void test() {
         "P0".intern();
         var value = RT.ldc();
-        assertEquals("foo", value);
+        assertEquals("foo", ((List<?>) value).getFirst());
       }
     }
+    Foo.test();
   }
 
   @Test
   public void ldcBasicType() {
-    class Foo {
-      private static final String $P0 = "Z";
-      private static final String $P1 = "B";
-      private static final String $P2 = "C";
-      private static final String $P3 = "S";
-      private static final String $P4 = "I";
-      private static final String $P5 = "J";
-      private static final String $P6 = "F";
-      private static final String $P7 = "D";
+    final class Foo {
+      private static final String $P0 = "list Z";
+      private static final String $P1 = "list B";
+      private static final String $P2 = "list C";
+      private static final String $P3 = "list S";
+      private static final String $P4 = "list I";
+      private static final String $P5 = "list J";
+      private static final String $P6 = "list F";
+      private static final String $P7 = "list D";
 
       static void test() {
         "P0".intern();
@@ -88,25 +90,25 @@ public class CondyLispTest {
         var v7 = RT.ldc();
 
         assertAll(
-            () -> assertEquals(boolean.class, v0),
-            () -> assertEquals(byte.class, v1),
-            () -> assertEquals(char.class, v2),
-            () -> assertEquals(short.class, v3),
-            () -> assertEquals(int.class, v4),
-            () -> assertEquals(long.class, v5),
-            () -> assertEquals(float.class, v6),
-            () -> assertEquals(double.class, v7)
+            () -> assertEquals(List.of(boolean.class), v0),
+            () -> assertEquals(List.of(byte.class), v1),
+            () -> assertEquals(List.of(char.class), v2),
+            () -> assertEquals(List.of(short.class), v3),
+            () -> assertEquals(List.of(int.class), v4),
+            () -> assertEquals(List.of(long.class), v5),
+            () -> assertEquals(List.of(float.class), v6),
+            () -> assertEquals(List.of(double.class), v7)
         );
       }
     }
+    Foo.test();
   }
 
   @Test
   public void ldcReferenceType() {
-    class Foo {
-      private static final String $P0 = "Ljava/lang/String;";
-      private static final String $P1 = "Qcom/github/forax/civilizer/value/Complex;";
-
+    final class Foo {
+      private static final String $P0 = "list Ljava/lang/String;";
+      private static final String $P1 = "list Lcom/github/forax/civilizer/value/Complex;";
 
       static void test() {
         "P0".intern();
@@ -115,36 +117,32 @@ public class CondyLispTest {
         var v1 = RT.ldc();
 
         assertAll(
-            () -> assertEquals(String.class, v0),
-            () -> assertEquals(Complex.class, v1)
+            () -> assertEquals(List.of(String.class), v0),
+            () -> assertEquals(List.of(Complex.class), v1)
         );
       }
     }
+    Foo.test();
   }
 
   @Test
   public void ldcArrayType() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "array Ljava/lang/String;";
-      private static final String $P1 = "array Qcom/github/forax/civilizer/value/Complex;";
 
       static void test() {
         "P0".intern();
         var v0 = RT.ldc();
-        "P1".intern();
-        var v1 = RT.ldc();
 
-        assertAll(
-            () -> assertEquals(String[].class, v0),
-            () -> assertTrue(com.github.forax.civilizer.vrt.RT.isNullRestrictedArray(v1)) // FIXME, check that the array is not nullable
-        );
+        assertEquals(String[].class, v0);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispSpecies() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "species Ljava/lang/String;";
 
       static void test() {
@@ -154,41 +152,44 @@ public class CondyLispTest {
         assertEquals(new Species(String.class, null), value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispSpeciesParameters() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "species Ljava/util/List; Ljava/lang/Integer;";
       private static final String $P1 = "species.parameters P0;";
 
       static void test() {
-        "P0".intern();
+        "P1".intern();
         var value = RT.ldc();
 
         assertEquals(Integer.class, value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispSpeciesRaw() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "species Ljava/util/List; Ljava/lang/Integer;";
       private static final String $P1 = "species.raw P0;";
 
       static void test() {
-        "P0".intern();
+        "P1".intern();
         var value = RT.ldc();
 
         assertEquals(List.class, value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispListOf() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "list Ljava/lang/String; I";
 
       static void test() {
@@ -198,12 +199,13 @@ public class CondyLispTest {
         assertEquals(List.of(String.class, int.class), value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispListGet() {
-    class Foo {
-      private static final String $P0 = "list.get Ljava/lang/String; I";
+    final class Foo {
+      private static final String $P0 = "list Ljava/lang/String; I";
       private static final String $P1 = "list.get P0; 1";
 
       static void test() {
@@ -213,11 +215,12 @@ public class CondyLispTest {
         assertEquals(int.class, value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispLinkage() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "linkage Ljava/lang/String;";
 
       static void test() {
@@ -227,11 +230,12 @@ public class CondyLispTest {
         assertEquals(new Linkage(String.class), value);
       }
     }
+    Foo.test();
   }
 
   @Test
   public void condyLispEval() {
-    class Foo {
+    final class Foo {
       private static final String $P0 = "mh Ljava/lang/Integer; 'sum (II)I";
       private static final String $P1 = "eval P0; 2 3";
 
@@ -242,8 +246,11 @@ public class CondyLispTest {
         assertEquals(5, value);
       }
     }
+    Foo.test();
   }
 
+
+  @SuppressWarnings("UnusedMethod")  // used by reflection
   private static Object bsmValue(Location location, Integer value) {
     return location.specialize(value == null ? 42 : value);
   }
@@ -251,7 +258,7 @@ public class CondyLispTest {
   @Test
   public void ldcClassDataNoArgument() {
     @Parametric("P0")
-    class Foo<T> {
+    final class Foo<T> {
       private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/prt/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
       private static final String $P1 = "anchor P0;";
 
@@ -266,6 +273,7 @@ public class CondyLispTest {
   }
 
   @Parametric("P0")
+  @SuppressWarnings("UnusedTypeParameter")
   record Data<T>() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/parametric/CondyLispTest; 'bsmValue (Lcom/github/forax/civilizer/prt/Location;Ljava/lang/Integer;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
@@ -296,6 +304,7 @@ public class CondyLispTest {
 
 
   @Parametric("P0")
+  @SuppressWarnings("UnusedTypeParameter")
   record Data3<T>() {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
@@ -325,7 +334,7 @@ public class CondyLispTest {
   }
 
 
-  class MethodData {
+  final static class MethodData {
     private static final String $P0 = "mh Lcom/github/forax/civilizer/prt/JDK; 'identity (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
     private static final String $P1 = "anchor P0;";
     private static final String $P2 = "linkage 42";
@@ -335,8 +344,6 @@ public class CondyLispTest {
       "P1".intern();
       return RT.ldc();
     }
-
-
 
     static void test() {
       "P2".intern();
