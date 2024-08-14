@@ -1,8 +1,8 @@
 package com.github.forax.civilizer.value;
 
-import com.github.forax.civilizer.vrt.NonNull;
-import com.github.forax.civilizer.vrt.Nullable;
 import com.github.forax.civilizer.vrt.RT;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
@@ -11,9 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class IdentityTest {
   record Foo(int value) {}

@@ -1,9 +1,9 @@
 package com.github.forax.civilizer;
 
-import com.github.forax.civilizer.vrt.NonNull;
-import com.github.forax.civilizer.vrt.Nullable;
 import com.github.forax.civilizer.vrt.Value;
 import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ByteVector;

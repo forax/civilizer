@@ -1,10 +1,10 @@
 package com.github.forax.civilizer.value;
 
-import com.github.forax.civilizer.vrt.NonNull;
-import com.github.forax.civilizer.vrt.Nullable;
 import com.github.forax.civilizer.vrt.RT;
 import com.github.forax.civilizer.vrt.Value;
 import com.github.forax.civilizer.vrt.ImplicitlyConstructible;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
