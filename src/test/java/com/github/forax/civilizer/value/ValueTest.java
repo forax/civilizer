@@ -3,6 +3,8 @@ package com.github.forax.civilizer.value;
 import com.github.forax.civilizer.vrt.RT;
 import com.github.forax.civilizer.vrt.Value;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -15,12 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@NullMarked
 public class ValueTest {
   @Value record Foo(int value) {}
 
   static class FooContainer {
     @Nullable Foo fooNullable;
-    @NonNull Foo fooNonNull;
+    Foo fooNonNull;
+
+    public FooContainer(Foo fooNonNull) {
+      this.fooNonNull = fooNonNull;
+      //super();
+    }
   }
 
   private static final int ACC_IDENTITY = 0x0020;
@@ -38,57 +46,58 @@ public class ValueTest {
 
   @Test
   public void container() {
-     var container = new FooContainer();
+     var container = new FooContainer(new Foo(42));
      assertAll(
          () -> assertNull(container.fooNullable),
-         () -> assertNull(container.fooNonNull)
+         () -> assertEquals(new Foo(42), container.fooNonNull)
      );
   }
 
   @Test
   public void containerWrite() {
-    var container = new FooContainer();
+    var container = new FooContainer(new Foo(42));
     container.fooNullable = null;
-    container.fooNonNull = null;
+    container.fooNonNull = null;  // FIXME
   }
 
   @Test
   public void nonNull() {
-    record Bar() {
-      public static void bar(@NonNull Foo foo) {}
+    record BarNonNull() {
+      static void bar(Foo foo) {}
     }
 
-    assertThrows(NullPointerException.class, () -> Bar.bar(null));
+    assertThrows(NullPointerException.class, () -> BarNonNull.bar(null));
   }
 
   @Test
   public void nonNull2() {
-    record Bar() {
-      public static void bar(@NonNull Foo foo, double d, @NonNull Foo foo2) {}
+    record BarNonNull2() {
+      static void bar(Foo foo, double d, Foo foo2) {}
     }
 
     assertAll(
-        () -> assertThrows(NullPointerException.class, () -> Bar.bar(null, 2.0, new Foo(27))),
-        () -> assertThrows(NullPointerException.class, () -> Bar.bar(new Foo(42), 2.0, null))
+        () -> assertThrows(NullPointerException.class, () -> BarNonNull2.bar(null, 2.0, new Foo(27))),
+        () -> assertThrows(NullPointerException.class, () -> BarNonNull2.bar(new Foo(42), 2.0, null))
     );
   }
 
   @Test
   public void nullable() {
-    record Bar() {
-      public static void bar(@Nullable Foo foo) {}
+    record BarNullable() {
+      static void bar(@Nullable Foo foo) {}
     }
 
-    Bar.bar(null);  // Ok !
+    BarNullable.bar(null);  // Ok !
   }
 
   @Test
   public void nullableByDefault() {
-    record Bar() {
-      public static void bar(long l, Foo foo) {}
+    @NullUnmarked
+    record BarNullUnmarked() {
+      static void bar(long l, Foo foo) {}
     }
 
-    Bar.bar(42L, null);  // Ok !
+    BarNullUnmarked.bar(42L, null);  // Ok !
   }
 
   @Test
