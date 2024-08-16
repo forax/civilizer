@@ -68,14 +68,14 @@ public final class ValueRewriter {
   }
 
   private enum TypeKind {
-    IDENTITY, VALUE, ZERO_DEFAULT;
+    IDENTITY, VALUE, IMPLICITLY_CONSTRUCTIBLE;
 
     boolean isIdentity() {
       return this == IDENTITY;
     }
 
-    boolean isZeroDefault() {
-      return this == ZERO_DEFAULT;
+    boolean isImplicitlyConstructible() {
+      return this == IMPLICITLY_CONSTRUCTIBLE;
     }
 
     TypeKind max(TypeKind kind) {
@@ -124,10 +124,10 @@ public final class ValueRewriter {
   private static final String NULL_UNMARKED_DESCRIPTOR = NullUnmarked.class.descriptorString();
 
   private static final String VALUE_DESCRIPTOR = Value.class.descriptorString();
-  private static final String ZERO_DEFAULT_DESCRIPTOR = ImplicitlyConstructible.class.descriptorString();
+  private static final String IMPLICITLY_CONSTRUCTIBLE_DESCRIPTOR = ImplicitlyConstructible.class.descriptorString();
 
-  private static final String IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR = "Ljdk/internal/vm/annotation/ImplicitlyConstructible;";
-  private static final String NULL_RESTRICTED_DESCRIPTOR = "Ljdk/internal/vm/annotation/NullRestricted;";
+  private static final String JDK_IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR = "Ljdk/internal/vm/annotation/ImplicitlyConstructible;";
+  private static final String JDK_NULL_RESTRICTED_DESCRIPTOR = "Ljdk/internal/vm/annotation/NullRestricted;";
 
   private static final class LoadableDescriptorsAttribute extends Attribute {
     private final List<String> descriptors ;
@@ -215,20 +215,20 @@ public final class ValueRewriter {
         if (descriptor.equals(VALUE_DESCRIPTOR)) {
           return TypeKind.VALUE;
         }
-        if (descriptor.equals(ZERO_DEFAULT_DESCRIPTOR)) {
-          return TypeKind.ZERO_DEFAULT;
+        if (descriptor.equals(IMPLICITLY_CONSTRUCTIBLE_DESCRIPTOR)) {
+          return TypeKind.IMPLICITLY_CONSTRUCTIBLE;
         }
         return TypeKind.IDENTITY;
       }
 
       @Override
       public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        // System.out.println("class.visitAnnotation: descriptor = " + descriptor);
         if (descriptor.equals(NULL_MARKED_DESCRIPTOR)) {
           nullScope = NullScope.NULL_MARKED;
         } else if (descriptor.equals(NULL_UNMARKED_DESCRIPTOR)) {
           nullScope = NullScope.NULL_UNMARKED;
         } else {
-          // System.out.println("class.visitAnnotation: descriptor = " + descriptor);
           typeKind = typeKind.max(typeKindFromAnnotation(descriptor));
         }
         return null;
@@ -352,7 +352,7 @@ public final class ValueRewriter {
     };
   }
 
-  private static NullKind fromScope(NullScope nullScope) {
+  private static NullKind toNullKind(NullScope nullScope) {
     return switch (nullScope) {
       case null -> NullKind.NULLABLE;
       case NULL_MARKED -> NullKind.NONNULL;
@@ -412,15 +412,15 @@ public final class ValueRewriter {
             }
             super.visit(classVersion, classAccess, name, signature, superName, interfaces);
 
-            if (kind.isZeroDefault()) {
-              var av = super.visitAnnotation(IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR, true);
+            if (kind.isImplicitlyConstructible()) {
+              var av = super.visitAnnotation(JDK_IMPLICIT_CONSTRUCTIBLE_DESCRIPTOR, true);
               av.visitEnd();
             }
           }
 
           private NullKind fieldNullKind(String fieldName, String fieldDescriptor) {
             return Optional.ofNullable(fieldDataMap.get(fieldName + "." + fieldDescriptor)).map(FieldData::nullKind)
-                .orElseGet(() -> fromScope(classScope));
+                .orElseGet(() -> toNullKind(classScope));
           }
 
           @Override
@@ -436,16 +436,17 @@ public final class ValueRewriter {
             if (typeSort == Type.OBJECT /* || typeSort == Type.ARRAY*/) {
               var nullKind = fieldNullKind(fieldName, fieldDescriptor);
               var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
-              if (nullKind == NullKind.NONNULL && typeKind == TypeKind.ZERO_DEFAULT) {
+              if (nullKind == NullKind.NONNULL && typeKind == TypeKind.IMPLICITLY_CONSTRUCTIBLE) {
                 System.out.println("  rewrite field " + fieldName + "." + fieldDescriptor + " " + nullKind + " " + typeKind);
-                var av = fv.visitAnnotation(NULL_RESTRICTED_DESCRIPTOR, true);
+                var av = fv.visitAnnotation(JDK_NULL_RESTRICTED_DESCRIPTOR, true);
                 av.visitEnd();
               }
             }
             return fv;
           }
 
-          private static final Set<String> ALLOWED_SUPER_NAMES = Set.of("java/lang/Object", "java/lang/Number", "java/lang/Record");
+          private static final Set<String> ALLOWED_SUPER_NAMES =
+              Set.of("java/lang/Object", "java/lang/Number", "java/lang/Record");
 
           @Override
           public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
@@ -468,6 +469,7 @@ public final class ValueRewriter {
 
           @Override
           public void visitInnerClass(String name, String outerName, String innerName, int access) {
+            // workaround JVM bug, it should not be necessary to modify that attribute
             var typeKind = Optional.ofNullable(classDataMap.get(name)).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
             var innerAccess = typeKind.isIdentity() ?
                 access /*| ACC_IDENTITY*/ :
@@ -519,7 +521,7 @@ public final class ValueRewriter {
       private int maxLocals = -1;
 
       private NullKind parameterNullKind(int i) {
-        return Optional.ofNullable(parameterMap.get(i)).orElseGet(() -> fromScope(methodNullScope));
+        return Optional.ofNullable(parameterMap.get(i)).orElseGet(() -> toNullKind(methodNullScope));
       }
 
       @Override
@@ -529,10 +531,9 @@ public final class ValueRewriter {
         for(var i = 0; i < types.length; i++) {
           var type = types[i];
           var typeSort = type.getSort();
-          if (typeSort == Type.OBJECT /*|| typeSort == Type.ARRAY FIXME*/) {
+          if (typeSort == Type.OBJECT) {
             var parameterNullKind = parameterNullKind(i);
             if (parameterNullKind == NullKind.NONNULL) {
-              //var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
               mv.visitVarInsn(ALOAD, slot);
               mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
               mv.visitInsn(POP);
