@@ -44,7 +44,7 @@ public class IdentityTest {
   public void containerWrite() {
     var container = new FooContainer();
     container.fooNullable = null;
-    container.fooNonNull = null;
+    assertThrows(NullPointerException.class, () -> container.fooNonNull = null);
   }
 
   @Test

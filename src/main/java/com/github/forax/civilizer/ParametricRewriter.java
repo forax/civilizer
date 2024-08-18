@@ -12,6 +12,7 @@ import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
@@ -150,7 +152,7 @@ public final class ParametricRewriter {
   }
 
 
-  private static final int ACC_VALUE = 0x0040;
+  private static final int ACC_IDENTITY = Opcodes.ACC_SUPER;
 
   private static final String RT_INTERNAL = RT.class.getName().replace('.', '/');
   private static final Handle BSM_LDC = new Handle(H_INVOKESTATIC, RT_INTERNAL,
@@ -219,7 +221,7 @@ public final class ParametricRewriter {
       "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
       false);
 
-  private static Optional<ClassData> analyze(byte[] buffer) {
+  private static ClassData analyze(byte[] buffer) {
     record ProtoCondy(String condyName, String action, List<String> args) {}
 
     var anchorKindMap = new HashMap<String, AnchorKind>();
@@ -231,8 +233,9 @@ public final class ParametricRewriter {
     var methodRestrictionMap = new HashMap<Method, String>();
 
     var reader = new ClassReader(buffer);
-    if ((reader.getAccess() & ACC_VALUE) != 0) {
-      return Optional.empty();
+    var access = reader.getAccess();
+    if ((access & ACC_ABSTRACT) == 0 && (access & ACC_IDENTITY) == 0) {
+      throw new IllegalStateException("class " + reader.getClassName() + " is already declared as a value class");
     }
     var cv = new ClassVisitor(ASM9) {
       private static final String PARAMETRIC_DESCRIPTOR = "L" + Parametric.class.getName().replace('.', '/') + ";";
@@ -254,7 +257,7 @@ public final class ParametricRewriter {
             if (!name.equals("value") || !(value instanceof String constant)) {
               throw new AssertionError("Parametric is malformed !");
             }
-            if (!"".equals(constant)) {   // FIXME ??
+            if (!constant.isEmpty()) {   // FIXME ??
               anchorKindMap.merge(constant, anchorKind, (k1, k2) -> {
                 if (k1 != k2) {
                   throw new RewriterException("anchor " + constant + " defined as both a class and a method anchor");
@@ -388,8 +391,8 @@ public final class ParametricRewriter {
       }
 
       private AnchorKind decodeAnchorAction(String condyName, List<String> args) {
-        assert args.size() < 1 || args.size() > 2;
-        var argument = condyArgument(args.get(0));
+        assert args.isEmpty() || args.size() > 2;
+        var argument = condyArgument(args.getFirst());
         if (!(argument instanceof ConstantDynamic reference)) {  // FIXME, it can be a reference to the parent kiddy pool
           throw new RewriterException("anchor argument is not a reference to a constant " + condyName);
         }
@@ -429,7 +432,7 @@ public final class ParametricRewriter {
       }
 
       private static RootInfo anchorRoot(ProtoCondy protoCondy, Map<String, ProtoCondy> protoCondyMap) {
-        if (protoCondy.args.size() < 1 || protoCondy.args.size() > 2) {
+        if (protoCondy.args.isEmpty() || protoCondy.args.size() > 2) {
           throw new RewriterException("anchor " + protoCondy.condyName + " has not the right number of arguments");
         }
         String parentName;
@@ -529,7 +532,7 @@ public final class ParametricRewriter {
     };
     reader.accept(cv, 0);
 
-    return Optional.of(new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap));
+    return new ClassData(cv.internalName, cv.parametric, condyMap, condyFieldAccessors, fieldRestrictionMap, methodParametricSet, methodRestrictionMap);
   }
 
   private static void rewrite(List<Path> classes, Analysis analysis) throws IOException {
@@ -950,10 +953,8 @@ public final class ParametricRewriter {
       try (var input = Files.newInputStream(path)) {
         var bytecode = input.readAllBytes();
         System.out.println("analyze " + path);
-        var classDataOpt = analyze(bytecode);
-        classDataOpt.ifPresent(classData -> {
-          classDataMap.put(classData.internalName, classData);
-        });
+        var classData = analyze(bytecode);
+       classDataMap.put(classData.internalName, classData);
       }
     }
     return new Analysis(classDataMap);

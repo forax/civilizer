@@ -57,7 +57,7 @@ public class ValueTest {
   public void containerWrite() {
     var container = new FooContainer(new Foo(42));
     container.fooNullable = null;
-    container.fooNonNull = null;  // FIXME
+    assertThrows(NullPointerException.class, () -> container.fooNonNull = null);
   }
 
   @Test

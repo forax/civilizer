@@ -32,10 +32,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.CHECKCAST;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.POP;
@@ -89,10 +91,17 @@ public final class ValueRewriter {
 
   private enum NullKind { NONNULL, NULLABLE }
 
-  private record ClassData(String internalName, String superName, Outer outer, TypeKind typeKind, NullScope nullScope, Set<String> descriptors, Map<String,FieldData> fieldDataMap, Map<String,MethodData> methodDataMap) { }
+  private record ClassData(int access, String internalName, String superName, Outer outer, TypeKind typeKind, NullScope nullScope, Set<String> descriptors, Map<String,FieldData> fieldDataMap, Map<String,MethodData> methodDataMap) { }
   private record FieldData(NullKind nullKind) {}
   private record MethodData(NullScope nullScope, Map<Integer, NullKind> parameterMap) {}
 
+  private static String mangleField(String fieldName, String fieldDescriptor) {
+    return fieldName + "." + fieldDescriptor;
+  }
+
+  private static String mangleMethod(String methodName, String methodDescriptor) {
+    return methodName + methodDescriptor;
+  }
 
   private record Analysis(Map<String,ClassData> classDataMap) {
     void dump() {
@@ -167,8 +176,8 @@ public final class ValueRewriter {
       try (var input = Files.newInputStream(path)) {
         var bytecode = input.readAllBytes();
         System.out.println("analyze " + path);
-        var classDataOpt = analyze(bytecode);
-        classDataOpt.ifPresent(classData -> classDataMap.put(classData.internalName, classData));
+        var classData = analyze(bytecode);
+        classDataMap.put(classData.internalName, classData);
       }
     }
 
@@ -185,11 +194,12 @@ public final class ValueRewriter {
     return Optional.empty();
   }
 
-  private static Optional<ClassData> analyze(byte[] buffer) {
+  private static ClassData analyze(byte[] buffer) {
     var fieldDataMap = new HashMap<String, FieldData>();
     var methodDataMap = new HashMap<String, MethodData>();
 
     var cv = new ClassVisitor(ASM9) {
+      private int access;
       private String internalName;
       private String superName;
       private TypeKind typeKind;
@@ -198,9 +208,7 @@ public final class ValueRewriter {
 
       @Override
       public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-        if ((access & ACC_IDENTITY) == 0) {
-          throw new AssertionError("can not rewrite a class that is already a value class, try mvn clean");
-        }
+        this.access = access;
         internalName = name;
         this.superName = superName;
         typeKind = TypeKind.IDENTITY;
@@ -209,6 +217,13 @@ public final class ValueRewriter {
       @Override
       public void visitOuterClass(String owner, String name, String descriptor) {
         outer = new Outer(owner, name, descriptor);
+      }
+
+      @Override
+      public void visitInnerClass(String name, String outerName, String innerName, int access) {
+        if (outer == null && name.equals(internalName)) {
+          outer = new Outer(outerName, null, null);
+        }
       }
 
       private static TypeKind typeKindFromAnnotation(String descriptor) {
@@ -240,7 +255,7 @@ public final class ValueRewriter {
           @Override
           public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
             // System.out.println("field.visitTypeAnnotation: descriptor = " + descriptor);
-            nullKind(descriptor).ifPresent(nullKind -> fieldDataMap.put(fieldName + "." + fieldDescriptor, new FieldData(nullKind)));
+            nullKind(descriptor).ifPresent(nullKind -> fieldDataMap.put(mangleField(fieldName, fieldDescriptor), new FieldData(nullKind)));
             return null;
           }
         };
@@ -286,20 +301,17 @@ public final class ValueRewriter {
 
           @Override
           public void visitEnd() {
-            methodDataMap.put(methodName + methodDescriptor, new MethodData(nullScope, parameterMap));
+            methodDataMap.put(mangleMethod(methodName, methodDescriptor), new MethodData(nullScope, parameterMap));
           }
         };
       }
     };
 
     var reader = new ClassReader(buffer);
-    if ((reader.getAccess() & ACC_IDENTITY) == 0) {  //FIXME (re-evaluate) do not rewrite value class, ASM is not ready for this
-      return Optional.empty();
-    }
     var descriptors = new HashSet<String>();
     var dependencyVisitor = dependencyCollectorAdapter(descriptors, cv);
     reader.accept(dependencyVisitor,0);
-    return Optional.of(new ClassData(cv.internalName, cv.superName, cv.outer, cv.typeKind, cv.nullScope, descriptors, fieldDataMap, methodDataMap));
+    return new ClassData(cv.access, cv.internalName, cv.superName, cv.outer, cv.typeKind, cv.nullScope, descriptors, fieldDataMap, methodDataMap);
   }
 
   private static Optional<String> loadableDescriptor(Type type) {
@@ -374,9 +386,9 @@ public final class ValueRewriter {
       throw new IllegalStateException("no class data for " + outer.owner);
     }
     if (outer.name != null) {
-      var methodData = classDataOuter.methodDataMap.get(outer.name + outer.descriptor);
+      var methodData = classDataOuter.methodDataMap.get(mangleMethod(outer.name, outer.descriptor));
       if (methodData == null) {
-        throw new IllegalStateException("no method data for " + outer.name+ "." + outer.name + outer.descriptor);
+        throw new IllegalStateException("no method data for " + outer.owner + "." + outer.name + outer.descriptor);
       }
       var methodOuterScope = methodData.nullScope;
       if (methodOuterScope != null) {
@@ -387,11 +399,20 @@ public final class ValueRewriter {
     return resolveNullScope(classDataMap, classDataOuter);
   }
 
+  private static NullKind fieldNullKind(Map<String, FieldData> fieldDataMap, NullScope classScope, String fieldName, String fieldDescriptor) {
+    return Optional.ofNullable(fieldDataMap.get(mangleField(fieldName, fieldDescriptor)))
+        .map(FieldData::nullKind)
+        .orElseGet(() -> toNullKind(classScope));
+  }
+
   private static Optional<byte[]> rewrite(byte[] buffer, Analysis analysis) {
     var reader = new ClassReader(buffer);
     var classDataMap = analysis.classDataMap;
     var classData = classDataMap.get(reader.getClassName());
     if (classData == null) {  // analysis is not available
+      throw new IllegalStateException("no analysis for class " + reader.getClassName());
+    }
+    if ((classData.access & ACC_ABSTRACT) != 0) {  // do not rewrite abstract class or interface
       return Optional.empty();
     }
     var classScope = resolveNullScope(classDataMap, classData);
@@ -418,11 +439,6 @@ public final class ValueRewriter {
             }
           }
 
-          private NullKind fieldNullKind(String fieldName, String fieldDescriptor) {
-            return Optional.ofNullable(fieldDataMap.get(fieldName + "." + fieldDescriptor)).map(FieldData::nullKind)
-                .orElseGet(() -> toNullKind(classScope));
-          }
-
           @Override
           public FieldVisitor visitField(int access, String fieldName, String fieldDescriptor, String signature, Object value) {
             var kind = classData.typeKind;
@@ -434,7 +450,7 @@ public final class ValueRewriter {
             var type = Type.getType(fieldDescriptor);
             var typeSort = type.getSort();
             if (typeSort == Type.OBJECT /* || typeSort == Type.ARRAY*/) {
-              var nullKind = fieldNullKind(fieldName, fieldDescriptor);
+              var nullKind = fieldNullKind(fieldDataMap, classScope, fieldName, fieldDescriptor);
               var typeKind = Optional.ofNullable(classDataMap.get(type.getInternalName())).map(ClassData::typeKind).orElse(TypeKind.IDENTITY);
               if (nullKind == NullKind.NONNULL && typeKind == TypeKind.IMPLICITLY_CONSTRUCTIBLE) {
                 System.out.println("  rewrite field " + fieldName + "." + fieldDescriptor + " " + nullKind + " " + typeKind);
@@ -453,17 +469,21 @@ public final class ValueRewriter {
             var mv = super.visitMethod(access, methodName, methodDescriptor, signature, exceptions);
             var kind = classData.typeKind;
             if (!kind.isIdentity() && ALLOWED_SUPER_NAMES.contains(classData.superName)) {
+              // move super calls in the constructor
               mv = moveSuperCallToTheEnd(mv, classData.superName);
             }
-            var methodData = methodDataMap.get(methodName + methodDescriptor);
+            var methodData = methodDataMap.get(mangleMethod(methodName, methodDescriptor));
             if (methodData != null && Type.getArgumentTypes(methodDescriptor).length != 0) {
               Map<Integer, NullKind> parameterMap = methodData.parameterMap;
               var nullScope = composeScope(classScope, methodData.nullScope);
               if (nullScope != null || !parameterMap.isEmpty()) {
                 System.out.println("  rewrite method " + methodName + "." + methodDescriptor + " " + parameterMap + " " + nullScope);
-                mv = preconditionsAdapter(nullScope, methodDescriptor, parameterMap, mv);
+                // add requireNonNull when needed
+                mv = preconditionsAdapter(nullScope, access, methodDescriptor, parameterMap, mv);
               }
             }
+            // intercept putfield, adds a nullcheck
+            mv = fieldPutAdapter(classDataMap, mv);
             return mv;
           }
 
@@ -516,7 +536,46 @@ public final class ValueRewriter {
     };
   }
 
-  private static MethodVisitor preconditionsAdapter(NullScope methodNullScope, String methodDescriptor, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
+  private static MethodVisitor fieldPutAdapter(Map<String, ClassData> classDataMap, MethodVisitor mv) {
+    return new MethodVisitor(ASM9, mv) {
+      @Override
+      public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        if (opcode == Opcodes.PUTFIELD) {
+          var type = Type.getType(descriptor);
+          var typeSort = type.getSort();
+          if (typeSort == Type.OBJECT || typeSort == Type.ARRAY) {
+            var ownerClassData = classDataMap.get(owner);
+            if (ownerClassData != null) { // do we have analysis information from the owner class ?
+              System.out.println("  rewrite putfield DEBUG resolveNullScope " + owner + " " + ownerClassData.outer);
+
+              var classScope = resolveNullScope(classDataMap, ownerClassData);
+              var fieldDataMap = ownerClassData.fieldDataMap;
+
+              System.out.println("  rewrite putfield DEBUG2 " + owner + "." + name + " " + descriptor + " " + classScope + " " + fieldDataMap);
+
+              var nullKind = fieldNullKind(fieldDataMap, classScope, name, descriptor);
+              if (nullKind == NullKind.NONNULL) {
+                var typeClassData = classDataMap.get(type.getInternalName());
+                if (typeClassData != null && typeClassData.typeKind == TypeKind.IMPLICITLY_CONSTRUCTIBLE) {
+                  // do nothing, the VM will do a nullcheck at runtime
+                } else {
+                  System.out.println("  rewrite putfield " + owner + "." + name + " " + descriptor + " " + nullKind);
+                  super.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "requireNonNull",
+                      "(Ljava/lang/Object;)Ljava/lang/Object;", false);
+                  if (!descriptor.equals("Ljava/lang/Object;")) {
+                    super.visitTypeInsn(CHECKCAST, type.getInternalName());
+                  }
+                }
+              }
+            }
+          }
+        }
+        super.visitFieldInsn(opcode, owner, name, descriptor);
+      }
+    };
+  }
+
+  private static MethodVisitor preconditionsAdapter(NullScope methodNullScope, int access, String methodDescriptor, Map<Integer, NullKind> parameterMap, MethodVisitor mv) {
     return new MethodVisitor(ASM9,  mv) {
       private int maxLocals = -1;
 
@@ -527,7 +586,7 @@ public final class ValueRewriter {
       @Override
       public void visitCode() {
         var types = Type.getArgumentTypes(methodDescriptor);
-        var slot = 0;
+        var slot = (access & ACC_STATIC) == 0 ? 1 : 0;
         for(var i = 0; i < types.length; i++) {
           var type = types[i];
           var typeSort = type.getSort();
