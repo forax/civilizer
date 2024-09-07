@@ -66,7 +66,7 @@ Each constant is initialized with a kind of LISP (condy-LISP) that recognizes th
 - `species.parameters` &lt;species&gt; returns the parameters part of a species,
 - `super` &lt;species&gt;... specifies the parametrized supers interfaces.
 
-The atoms of a cody-LISP expression are
+The atoms of a condy-LISP expression are
 - a primitive type (Z, B, C, S, I, J, F, D) or void (V),
 - a type descriptor, starts with 'L' , ends with a semicolon,
 - a zero default value type descriptor, starts with 'Q', ends with a semicolon,
